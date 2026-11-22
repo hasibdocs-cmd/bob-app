@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NagaraAI Architecture Guide</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--card:#21253a;--border:#2e3350;
+  --text:#e8eaf0;--muted:#7b82a0;--accent:#4f8ef7;--accent2:#7c5cd8;
+  --green:#22c55e;--yellow:#f59e0b;--orange:#f97316;--red:#ef4444;
+  --cyan:#06b6d4;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:14px;line-height:1.6}
+h1,h2,h3,h4{font-weight:600}
+nav{display:flex;gap:4px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;position:sticky;top:0;z-index:100}
+nav button{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;background:transparent;color:var(--muted);transition:.2s}
+nav button.active,nav button:hover{background:var(--accent);color:#fff}
+.hero{padding:28px 24px 8px;text-align:center}
+.hero h1{font-size:26px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{color:var(--muted);margin-top:6px;font-size:13px}
+.panel{display:none;padding:24px;animation:fadeIn .3s ease}
+.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
+.card h3{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:12px}
+.section-title{font-size:18px;font-weight:600;margin-bottom:4px}
+.section-sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+/* arch */
+.arch{display:flex;flex-direction:column;gap:6px;align-items:center}
+.arch-row{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap}
+.arch-box{border-radius:8px;padding:11px 16px;font-size:12px;font-weight:600;text-align:center;min-width:130px;cursor:default;transition:.2s}
+.arch-box:hover{transform:scale(1.04);filter:brightness(1.15)}
+.arch-box .sub{font-size:10px;font-weight:400;color:rgba(255,255,255,.65);margin-top:2px}
+.ab-browser{background:linear-gradient(135deg,#1e3a5f,#2563eb);border:1px solid #3b82f6}
+.ab-proxy{background:linear-gradient(135deg,#1e3a2f,#16a34a);border:1px solid #22c55e}
+.ab-fastapi{background:linear-gradient(135deg,#2d1b4e,#7c3aed);border:1px solid #8b5cf6}
+.ab-postgres{background:linear-gradient(135deg,#1e2a3a,#0284c7);border:1px solid #0ea5e9}
+.ab-watsonx{background:linear-gradient(135deg,#2d1a0e,#c2410c);border:1px solid #f97316}
+.ab-auth{background:linear-gradient(135deg,#2d1b1b,#b91c1c);border:1px solid #ef4444}
+.flow-arr{font-size:11px;color:var(--muted);text-align:center}
+/* status */
+.sf{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center;margin:14px 0}
+.sn{display:flex;flex-direction:column;align-items:center;gap:4px}
+.sb{padding:7px 13px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-open{background:rgba(79,142,247,.18);border:1.5px solid var(--accent);color:var(--accent)}
+.s-asgn{background:rgba(234,179,8,.15);border:1.5px solid #eab308;color:#eab308}
+.s-prog{background:rgba(249,115,22,.15);border:1.5px solid var(--orange);color:var(--orange)}
+.s-res{background:rgba(34,197,94,.15);border:1.5px solid var(--green);color:var(--green)}
+.s-cls{background:rgba(107,114,128,.2);border:1.5px solid #6b7280;color:#9ca3af}
+.s-esc{background:rgba(239,68,68,.15);border:1.5px solid var(--red);color:var(--red)}
+.sa{color:var(--muted);font-size:10px}
+.fc{padding:0 5px;color:var(--muted);font-size:18px;padding-bottom:16px}
+/* sla */
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:12px}
+.sc{border-radius:8px;padding:14px;text-align:center}
+.sc-crit{background:rgba(239,68,68,.1);border:1.5px solid var(--red)}
+.sc-high{background:rgba(249,115,22,.1);border:1.5px solid var(--orange)}
+.sc-med{background:rgba(234,179,8,.1);border:1.5px solid #eab308}
+.sc-low{background:rgba(34,197,94,.1);border:1.5px solid var(--green)}
+.sl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:4px}
+.sh{font-size:30px;font-weight:700;line-height:1}
+.su{font-size:11px;color:var(--muted);margin-top:2px}
+.sbar{height:4px;border-radius:2px;margin-top:10px}
+.bar-c{background:var(--red);width:100%}
+.bar-h{background:var(--orange);width:70%}
+.bar-m{background:#eab308;width:42%}
+.bar-l{background:var(--green);width:17%}
+.skw{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}
+/* roles table */
+.mw{overflow-x:auto;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--surface);color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.chk{text-align:center}
+.yes{color:var(--green);font-size:15px}
+.part{color:#eab308;font-size:13px}
+.no{color:var(--border);font-size:13px}
+tr:hover td{background:rgba(255,255,255,.025)}
+.rb{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}
+.rbc{background:rgba(79,142,247,.15);color:var(--accent)}
+.rbf{background:rgba(34,197,94,.15);color:var(--green)}
+.rbw{background:rgba(249,115,22,.15);color:var(--orange)}
+.rbo{background:rgba(124,92,216,.15);color:var(--accent2)}
+/* api */
+.am{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;font-family:monospace;margin-right:5px}
+.mg{background:rgba(34,197,94,.15);color:var(--green)}
+.mp{background:rgba(79,142,247,.15);color:var(--accent)}
+.mpa{background:rgba(249,115,22,.15);color:var(--orange)}
+.ap{font-family:monospace;font-size:12px}
+.ad{font-size:11px;color:var(--muted);margin-top:2px}
+.ar{padding:9px 0;border-bottom:1px solid var(--border)}
+.ar:last-child{border-bottom:none}
+.auth-b{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;margin-left:7px;background:rgba(239,68,68,.15);color:var(--red)}
+.auth-o{background:rgba(34,197,94,.15);color:var(--green)}
+/* escalation */
+.ef{margin-top:12px}
+.es{display:flex;gap:14px;align-items:flex-start;padding:14px;border-left:2px solid var(--border);margin-left:18px;position:relative;margin-bottom:0}
+.es::before{content:attr(data-n);position:absolute;left:-11px;top:14px;width:20px;height:20px;border-radius:50%;background:var(--card);border:2px solid;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;line-height:20px;text-align:center}
+.e1{border-color:var(--accent)}.e1::before{border-color:var(--accent);color:var(--accent)}
+.e2{border-color:#eab308}.e2::before{border-color:#eab308;color:#eab308}
+.e3{border-color:var(--orange)}.e3::before{border-color:var(--orange);color:var(--orange)}
+.e4{border-color:var(--red)}.e4::before{border-color:var(--red);color:var(--red)}
+.et{font-weight:600;font-size:13px;margin-bottom:3px}
+.ed{font-size:12px;color:var(--muted)}
+/* categories */
+.cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:12px}
+.cc{border-radius:8px;padding:13px;border:1px solid var(--border)}
+.ci{font-size:22px;margin-bottom:5px}
+.cn{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.ck{font-size:10px;color:var(--muted);line-height:1.6}
+.ck span{display:inline-block;background:rgba(255,255,255,.07);border-radius:3px;padding:0 4px;margin:1px 2px}
+/* guide */
+.gs{display:flex;gap:14px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--border)}
+.gs:last-child{border-bottom:none}
+.gn{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.gb h4{font-size:13px;font-weight:600;margin-bottom:2px}
+.gb p{font-size:12px;color:var(--muted)}
+/* misc */
+.tip{background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--accent);margin-top:10px}
+.tip strong{color:var(--text)}
+code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px;font-size:11px;font-family:monospace}
+.live{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:5px;vertical-align:middle;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-top:12px}
+.dc{background:var(--surface);border-radius:8px;padding:12px;border:1px solid var(--border)}
+.dc .role{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+footer{text-align:center;padding:22px;color:var(--muted);font-size:11px;border-top:1px solid var(--border);margin-top:32px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>🏙️ NagaraAI — Architecture &amp; Workflow Guide</h1>
+  <p>Bengaluru Civic Intelligence Platform · Interactive Reference</p>
+</div>
+<nav id="mainnav">
+  <button class="active" onclick="show('arch',this)">🏗️ Architecture</button>
+  <button onclick="show('lifecycle',this)">🔄 Complaint Lifecycle</button>
+  <button onclick="show('escalation',this)">🚨 Escalation Matrix</button>
+  <button onclick="show('roles',this)">👥 Role Permissions</button>
+  <button onclick="show('sla',this)">⏱️ SLA &amp; Categories</button>
+  <button onclick="show('api',this)">📡 API Reference</button>
+  <button onclick="show('guide',this)">📖 User Guide</button>
+</nav>
+
+<!-- ═══ ARCHITECTURE ═══════════════════════════════════════════════════════ -->
+<div id="arch" class="panel active">
+  <div class="section-title">System Architecture</div>
+  <div class="section-sub">Three-tier containerised stack with AI classification pipeline</div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Request Flow</h3>
+      <div class="arch">
+        <div class="arch-row"><div class="arch-box ab-browser">🌐 Browser<div class="sub">React SPA · :3000</div></div></div>
+        <div class="flow-arr">▼ HTTP /api/* via setupProxy.js</div>
+        <div class="arch-row"><div class="arch-box ab-proxy">🔀 CRA Dev Proxy<div class="sub">REACT_APP_PROXY_TARGET=http://backend:8000</div></div></div>
+        <div class="flow-arr">▼ Docker service "backend"</div>
+        <div class="arch-row"><div class="arch-box ab-fastapi">⚡ FastAPI + Uvicorn<div class="sub">:8000 · --reload · CORS</div></div></div>
+        <div class="arch-row" style="gap:20px;margin-top:4px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+            <div class="flow-arr">▼ JWT</div>
+            <div class="arch-box ab-auth">🔐 Auth<div class="sub">passlib · bcrypt 4.0.1</div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+            <div class="flow-arr">▼ classify</div>
+            <div class="arch-box ab-watsonx">🤖 watsonx.ai<div class="sub">Granite-13B · local fallback</div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+            <div class="flow-arr">▼ SQLAlchemy</div>
+            <div class="arch-box ab-postgres">🐘 PostgreSQL 16<div class="sub">pgdata PVC · :5432</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Docker Services</h3>
+      <table>
+        <tr><th>Container</th><th>Image</th><th>Port</th><th>Status</th></tr>
+        <tr><td>nagaraai_frontend</td><td>node:20-alpine</td><td>3000</td><td><span class="live"></span>Running</td></tr>
+        <tr><td>nagaraai_backend</td><td>python:3.12-slim</td><td>8000</td><td><span class="live"></span>Running</td></tr>
+        <tr><td>nagaraai_db</td><td>postgres:16-alpine</td><td>5432</td><td><span class="live"></span>Healthy</td></tr>
+        <tr><td>nagaraai_test</td><td>python:3.12-slim</td><td>—</td><td style="color:var(--muted)">Profile: test</td></tr>
+      </table>
+      <div class="tip"><strong>Proxy fix applied:</strong> <code>package.json "proxy"</code> pointed to <code>localhost:8000</code> (self inside Docker) → all API calls returned 500. Fixed via <code>src/setupProxy.js</code> using <code>REACT_APP_PROXY_TARGET=http://backend:8000</code>.</div>
+    </div>
+  </div>
+  <div class="grid2" style="margin-top:0">
+    <div class="card">
+      <h3>Frontend Pages &amp; Routing</h3>
+      <table>
+        <tr><th>Path</th><th>Component</th><th>Auth</th></tr>
+        <tr><td><code>/login</code></td><td>Login.js</td><td style="color:var(--green)">Public</td></tr>
+        <tr><td><code>/register</code></td><td>Register.js</td><td style="color:var(--green)">Public</td></tr>
+        <tr><td><code>/</code></td><td>Dashboard.js</td><td style="color:var(--red)">JWT required</td></tr>
+        <tr><td><code>/complaints</code></td><td>Complaints.js</td><td style="color:var(--red)">JWT required</td></tr>
+        <tr><td><code>/map</code></td><td>WardMap.js</td><td style="color:var(--red)">JWT required</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Backend API Routers</h3>
+      <table>
+        <tr><th>Prefix</th><th>Module</th><th>Endpoints</th></tr>
+        <tr><td><code>/api/auth</code></td><td>routes/auth.py</td><td>register, login, /me</td></tr>
+        <tr><td><code>/api/complaints</code></td><td>routes/complaints.py</td><td>CRUD + rate</td></tr>
+        <tr><td><code>/api/wards</code></td><td>routes/wards.py</td><td>list, stats</td></tr>
+        <tr><td><code>/api/analytics</code></td><td>routes/analytics.py</td><td>city, heatmap, contractors</td></tr>
+        <tr><td><code>/health</code></td><td>main.py</td><td>health check</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Data Models &amp; Relationships</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <div style="background:var(--surface);border-radius:8px;padding:12px 14px;border:1px solid var(--border);min-width:150px">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">👤 User</div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.8">id, name, email, phone<br>hashed_password<br>role, ward_id, is_active</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--border);font-size:18px">⟷</div>
+      <div style="background:var(--surface);border-radius:8px;padding:12px 14px;border:1px solid var(--border);min-width:195px">
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:6px">📋 Complaint</div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.8">id, ticket_id (NGA-XXXXXX)<br>title, description, category<br>priority, status<br>lat/lng, address, image_url<br>ai_classification, ai_confidence<br>reporter_id, assignee_id<br>ward_id, contractor_id<br>sla_deadline, resolved_at, citizen_rating</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--border);font-size:18px">⟷</div>
+      <div style="background:var(--surface);border-radius:8px;padding:12px 14px;border:1px solid var(--border);min-width:140px">
+        <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:6px">🏘️ Ward</div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.8">id, name, zone<br>population<br>flood_risk_score<br>cleanliness_score</div>
+      </div>
+      <div style="display:flex;align-items:center;color:var(--border);font-size:18px">⟷</div>
+      <div style="background:var(--surface);border-radius:8px;padding:12px 14px;border:1px solid var(--border);min-width:145px">
+        <div style="font-size:12px;font-weight:700;color:var(--orange);margin-bottom:6px">🔧 Contractor</div>
+        <div style="font-size:10px;color:var(--muted);line-height:1.8">id, name, contact<br>ward_id<br>compliance_score<br>total_assigned<br>total_resolved</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LIFECYCLE ═══════════════════════════════════════════════════════════ -->
+<div id="lifecycle" class="panel">
+  <div class="section-title">Complaint Lifecycle</div>
+  <div class="section-sub">From citizen submission through AI classification to resolution and rating</div>
+  <div class="card">
+    <h3>Status State Machine</h3>
+    <div class="sf">
+      <div class="sn"><div class="sb s-open">OPEN</div><div class="sa">Citizen submits</div></div>
+      <div class="fc">→</div>
+      <div class="sn"><div class="sb s-asgn">ASSIGNED</div><div class="sa">Officer assigns</div></div>
+      <div class="fc">→</div>
+      <div class="sn"><div class="sb s-prog">IN PROGRESS</div><div class="sa">Field officer</div></div>
+      <div class="fc">→</div>
+      <div class="sn"><div class="sb s-res">RESOLVED</div><div class="sa">Work complete</div></div>
+      <div class="fc">→</div>
+      <div class="sn"><div class="sb s-cls">CLOSED</div><div class="sa">Citizen rates</div></div>
+    </div>
+    <div style="text-align:center;margin-top:6px">
+      <span style="color:var(--muted);font-size:12px">Any status →</span>
+      <span class="sb s-esc" style="display:inline-block;margin-left:8px">ESCALATED</span>
+      <span style="color:var(--muted);font-size:12px;margin-left:8px">SLA breach / Ward Officer / Commissioner</span>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Submission &amp; AI Classification Pipeline</h3>
+    <div style="display:flex;flex-direction:column;gap:0;margin-top:8px">
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">1</div>
+        <div><b style="font-size:13px">Citizen submits complaint</b><br><span style="font-size:12px;color:var(--muted)">POST /api/complaints/ — title, description, category, lat/lng, ward_id. JWT required.</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">2</div>
+        <div><b style="font-size:13px">AI Classification</b><br><span style="font-size:12px;color:var(--muted)">Sends prompt to <code>ibm/granite-13b-instruct-v2</code> → returns category, priority, confidence, summary. If WATSONX_API_KEY is unset, rule-based keyword classifier runs (confidence = keyword_matches / 3.0, capped at 1.0).</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">3</div>
+        <div><b style="font-size:13px">SLA Deadline set</b><br><span style="font-size:12px;color:var(--muted)">Based on AI-assigned priority: Critical=4h · High=24h · Medium=72h · Low=168h. Stored as <code>sla_deadline</code>.</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">4</div>
+        <div><b style="font-size:13px">Auto-assign Contractor</b><br><span style="font-size:12px;color:var(--muted)">Highest <code>compliance_score</code> contractor in the ward auto-selected. <code>total_assigned += 1</code> immediately.</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;border-radius:50%;background:#eab308;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">5</div>
+        <div><b style="font-size:13px">Officers act — status transitions</b><br><span style="font-size:12px;color:var(--muted)">PATCH /api/complaints/{id} — set status, priority, assignee_id, contractor_id. Each change logs a <code>ComplaintUpdate</code> audit record with timestamp and note.</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border)">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">6</div>
+        <div><b style="font-size:13px">Resolution &amp; Compliance Score Update</b><br><span style="font-size:12px;color:var(--muted)">On status=resolved: <code>resolved_at</code> stamped. <code>compliance_score = round(total_resolved/total_assigned × 100, 1)</code></span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:11px 0">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;line-height:1">7</div>
+        <div><b style="font-size:13px">Citizen rates satisfaction</b><br><span style="font-size:12px;color:var(--muted)">POST /api/complaints/{id}/rate — integer 1–5. Only the reporter can rate. Stored as <code>citizen_rating</code>.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ESCALATION ══════════════════════════════════════════════════════════ -->
+<div id="escalation" class="panel">
+  <div class="section-title">Escalation Matrix</div>
+  <div class="section-sub">How complaints move up the authority chain when SLA is at risk or breached</div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Escalation Levels &amp; Path</h3>
+      <div class="ef">
+        <div class="es e1" data-n="1">
+          <div>
+            <div class="et">🟢 Normal — Open</div>
+            <div class="ed">Citizen submits → AI classifies → contractor auto-assigned → status: <span class="sb s-open" style="font-size:11px;padding:2px 8px;display:inline-block">OPEN</span><br>Who acts: <b style="color:var(--accent)">Field Officer</b></div>
+          </div>
+        </div>
+        <div class="es e2" data-n="2">
+          <div>
+            <div class="et">🟡 Level 1 — SLA at 50% elapsed</div>
+            <div class="ed">Complaint still not <code>in_progress</code> at halfway. Ward Officer should intervene, re-assign or raise priority.<br>Who acts: <b style="color:#eab308">Ward Officer</b> — re-assign field team</div>
+          </div>
+        </div>
+        <div class="es e3" data-n="3">
+          <div>
+            <div class="et">🟠 Level 2 — SLA Breach Imminent</div>
+            <div class="ed">Not resolved before <code>sla_deadline</code>. Ward Officer sets status → <span class="sb s-esc" style="font-size:11px;padding:2px 8px;display:inline-block">ESCALATED</span>. Commissioner sees it in dashboard.<br>Who acts: <b style="color:var(--orange)">Ward Officer → Commissioner review</b></div>
+          </div>
+        </div>
+        <div class="es e4" data-n="4">
+          <div>
+            <div class="et">🔴 Level 3 — SLA Breached</div>
+            <div class="ed">Deadline passed. Contractor compliance_score auto-recalculated on eventual resolution. Commissioner reassigns contractor or ward officer, or force-closes.<br>Who acts: <b style="color:var(--red)">Commissioner — contractor penalised</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Priority → SLA Window</h3>
+      <div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:8px 12px;align-items:center;margin-top:10px">
+        <span class="sb s-esc" style="font-size:11px;padding:3px 10px;display:inline-block">CRITICAL</span>
+        <div style="background:var(--red);border-radius:4px;height:10px;"></div>
+        <span style="font-size:12px;font-weight:700;color:var(--red)">4h</span>
+        <span style="font-size:10px;color:var(--muted)">emergency/flood/overflow</span>
+
+        <span style="background:rgba(249,115,22,.15);border:1.5px solid var(--orange);color:var(--orange);border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-block">HIGH</span>
+        <div style="background:var(--orange);border-radius:4px;height:10px;width:70%"></div>
+        <span style="font-size:12px;font-weight:700;color:var(--orange)">24h</span>
+        <span style="font-size:10px;color:var(--muted)">dangerous/hazard</span>
+
+        <span style="background:rgba(234,179,8,.15);border:1.5px solid #eab308;color:#eab308;border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-block">MEDIUM</span>
+        <div style="background:#eab308;border-radius:4px;height:10px;width:40%"></div>
+        <span style="font-size:12px;font-weight:700;color:#eab308">72h</span>
+        <span style="font-size:10px;color:var(--muted)">default</span>
+
+        <span style="background:rgba(34,197,94,.15);border:1.5px solid var(--green);color:var(--green);border-radius:12px;padding:3px 10px;font-size:11px;font-weight:600;display:inline-block">LOW</span>
+        <div style="background:var(--green);border-radius:4px;height:10px;width:16%"></div>
+        <span style="font-size:12px;font-weight:700;color:var(--green)">168h</span>
+        <span style="font-size:10px;color:var(--muted)">minor/small</span>
+      </div>
+      <h3 style="margin-top:20px">Contractor Compliance Impact</h3>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.9">
+        On every <span style="color:var(--green)">resolution</span>:<br>
+        <code>compliance_score = (total_resolved / total_assigned) × 100</code><br><br>
+        Auto-assignment always picks the contractor with the <span style="color:var(--accent)">highest compliance_score</span> in the ward.<br><br>
+        SLA breaches put the contractor under Commissioner review → may lead to ward reassignment.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ROLES ════════════════════════════════════════════════════════════════ -->
+<div id="roles" class="panel">
+  <div class="section-title">Role Permissions Matrix</div>
+  <div class="section-sub">What each role can see and do — enforced by JWT claims and backend query scoping</div>
+  <div class="grid3">
+    <div class="card" style="border-color:rgba(79,142,247,.4)">
+      <div style="font-size:22px">👤</div><div style="font-weight:700;color:var(--accent);margin:4px 0">Citizen</div>
+      <div style="font-size:11px;color:var(--muted)">Submits complaints, tracks own issues, rates resolutions. List view scoped to <code>reporter_id == me</code>.</div>
+    </div>
+    <div class="card" style="border-color:rgba(34,197,94,.4)">
+      <div style="font-size:22px">🔧</div><div style="font-weight:700;color:var(--green);margin:4px 0">Field Officer</div>
+      <div style="font-size:11px;color:var(--muted)">On-ground responder. Sees complaints where <code>assignee_id == me</code>. Updates status to in_progress and resolved.</div>
+    </div>
+    <div class="card" style="border-color:rgba(249,115,22,.4)">
+      <div style="font-size:22px">🏛️</div><div style="font-weight:700;color:var(--orange);margin:4px 0">Ward Officer</div>
+      <div style="font-size:11px;color:var(--muted)">Manages all complaints in their ward. Assigns field officers and contractors. Can escalate. Ward analytics access.</div>
+    </div>
+    <div class="card" style="border-color:rgba(124,92,216,.4)">
+      <div style="font-size:22px">📊</div><div style="font-weight:700;color:var(--accent2);margin:4px 0">Commissioner</div>
+      <div style="font-size:11px;color:var(--muted)">Full system visibility. All complaints, city analytics, contractor leaderboard, heatmap, escalation review.</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Detailed Permission Matrix</h3>
+    <div class="mw">
+      <table>
+        <tr><th>Capability</th><th class="chk"><span class="rb rbc">Citizen</span></th><th class="chk"><span class="rb rbf">Field Officer</span></th><th class="chk"><span class="rb rbw">Ward Officer</span></th><th class="chk"><span class="rb rbo">Commissioner</span></th></tr>
+        <tr><td>Submit complaint</td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>View own complaints</td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>View ward complaints</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>View all complaints</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Update status (in_progress)</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Mark resolved</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Assign field officer</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Reassign contractor</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Escalate complaint</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Rate resolved complaint</td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td></tr>
+        <tr><td>City analytics</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="part">~</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Ward heatmap</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Contractor leaderboard</td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="no">—</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+        <tr><td>Ward map view</td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td><td class="chk"><span class="yes">✓</span></td></tr>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px"><span class="yes">✓</span> Full access &nbsp;·&nbsp; <span class="part">~</span> Ward-scoped &nbsp;·&nbsp; <span class="no">—</span> Not permitted</div>
+  </div>
+</div>
+
+<!-- ═══ SLA ══════════════════════════════════════════════════════════════════ -->
+<div id="sla" class="panel">
+  <div class="section-title">SLA Rules &amp; Issue Categories</div>
+  <div class="section-sub">Service Level Agreements per priority and AI classification categories with keyword triggers</div>
+  <div class="card">
+    <h3>SLA Deadlines by Priority</h3>
+    <div class="sg">
+      <div class="sc sc-crit"><div class="sl" style="color:var(--red)">Critical</div><div class="sh" style="color:var(--red)">4</div><div class="su">hours</div><div class="sbar bar-c"></div><div class="skw">urgent · critical · emergency · flood · overflow</div></div>
+      <div class="sc sc-high"><div class="sl" style="color:var(--orange)">High</div><div class="sh" style="color:var(--orange)">24</div><div class="su">hours</div><div class="sbar bar-h"></div><div class="skw">high · dangerous · hazard</div></div>
+      <div class="sc sc-med"><div class="sl" style="color:#eab308">Medium</div><div class="sh" style="color:#eab308">72</div><div class="su">hours</div><div class="sbar bar-m"></div><div class="skw">Default when no priority keyword detected</div></div>
+      <div class="sc sc-low"><div class="sl" style="color:var(--green)">Low</div><div class="sh" style="color:var(--green)">168</div><div class="su">hours (7 days)</div><div class="sbar bar-l"></div><div class="skw">minor · small · low</div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>AI Classification Categories</h3>
+    <div class="cg">
+      <div class="cc" style="border-color:rgba(249,115,22,.35)"><div class="ci">🗑️</div><div class="cn" style="color:var(--orange)">Garbage Black Spot</div><div class="ck"><span>garbage</span><span>trash</span><span>waste</span><span>dump</span><span>black spot</span><span>refuse</span><span>littering</span><span>ಕಸ</span></div></div>
+      <div class="cc" style="border-color:rgba(234,179,8,.35)"><div class="ci">🏗️</div><div class="cn" style="color:#eab308">C&amp;D Waste</div><div class="ck"><span>construction</span><span>demolition</span><span>debris</span><span>rubble</span><span>cement</span><span>bricks</span><span>sand</span></div></div>
+      <div class="cc" style="border-color:rgba(6,182,212,.35)"><div class="ci">🌊</div><div class="cn" style="color:var(--cyan)">Waterlogging</div><div class="ck"><span>flood</span><span>waterlog</span><span>puddle</span><span>stagnant</span><span>overflow</span><span>rain water</span><span>ನೀರು</span></div></div>
+      <div class="cc" style="border-color:rgba(79,142,247,.35)"><div class="ci">🕳️</div><div class="cn" style="color:var(--accent)">Drain Blockage</div><div class="ck"><span>drain</span><span>blocked</span><span>clog</span><span>sewage</span><span>manhole</span><span>stormwater</span><span>rajakaluves</span></div></div>
+      <div class="cc" style="border-color:rgba(34,197,94,.35)"><div class="ci">💧</div><div class="cn" style="color:var(--green)">Groundwater</div><div class="ck"><span>borewell</span><span>groundwater</span><span>water shortage</span><span>dry</span><span>no water</span><span>tanker</span></div></div>
+      <div class="cc" style="border-color:rgba(107,114,128,.35)"><div class="ci">❓</div><div class="cn" style="color:#9ca3af">Other</div><div class="ck">No keyword match or confidence &lt; 0.4. Fallback category — Granite-13B provides better accuracy.</div></div>
+    </div>
+    <div class="tip" style="margin-top:14px"><strong>Confidence scoring:</strong> confidence = min(keyword_matches / 3.0, 1.0). If confidence == 0.4 (no match), category forced to "other". Set <code>WATSONX_API_KEY</code> in <code>backend/.env</code> to enable IBM Granite-13B for higher accuracy.</div>
+  </div>
+</div>
+
+<!-- ═══ API ════════════════════════════════════════════════════════════════ -->
+<div id="api" class="panel">
+  <div class="section-title">API Reference</div>
+  <div class="section-sub">All endpoints — Swagger UI at <code>http://localhost:8000/docs</code></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Auth &amp; Wards</h3>
+      <div class="ar"><div><span class="am mp">POST</span><span class="ap">/api/auth/register</span><span class="auth-b auth-o">Public</span></div><div class="ad">Register. Body: name, email, password, role, ward_id → returns UserOut (201)</div></div>
+      <div class="ar"><div><span class="am mp">POST</span><span class="ap">/api/auth/login</span><span class="auth-b auth-o">Public</span></div><div class="ad">Login. Body: email, password → access_token (JWT HS256 · 24h), token_type, user</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/auth/me</span><span class="auth-b">JWT</span></div><div class="ad">Returns current user profile</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/wards/</span><span class="auth-b auth-o">Public</span></div><div class="ad">All wards: id, name, zone, flood_risk_score, cleanliness_score</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/wards/{id}/stats</span><span class="auth-b auth-o">Public</span></div><div class="ad">Ward stats: open_count, resolved_count, scores</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/health</span><span class="auth-b auth-o">Public</span></div><div class="ad">Returns <code>{"status":"ok","service":"NagaraAI"}</code></div></div>
+
+      <h3 style="margin-top:20px">Analytics</h3>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/analytics/city</span><span class="auth-b">JWT</span></div><div class="ad">City KPIs: total/open complaints, resolved_today, avg_resolution_hours, top_category, high_risk_wards (flood_risk ≥ 7.0)</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/analytics/ward-heatmap</span><span class="auth-b">JWT</span></div><div class="ad">Per-ward open count + flood_risk_score + cleanliness_score</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/analytics/contractors</span><span class="auth-b">JWT</span></div><div class="ad">Leaderboard sorted by compliance_score desc, with resolution_rate</div></div>
+    </div>
+    <div class="card">
+      <h3>Complaints</h3>
+      <div class="ar"><div><span class="am mp">POST</span><span class="ap">/api/complaints/</span><span class="auth-b">JWT</span></div><div class="ad">Submit complaint. AI classifies → SLA set → contractor auto-assigned. Returns full ComplaintOut (201).</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/complaints/</span><span class="auth-b">JWT</span></div><div class="ad">List. Role-scoped (citizen=own, field=assigned, ward=ward, commissioner=all). Params: status, category, ward_id, limit(50), offset(0)</div></div>
+      <div class="ar"><div><span class="am mg">GET</span><span class="ap">/api/complaints/{id}</span><span class="auth-b">JWT</span></div><div class="ad">Single complaint with full <code>ComplaintUpdate</code> audit history</div></div>
+      <div class="ar"><div><span class="am mpa">PATCH</span><span class="ap">/api/complaints/{id}</span><span class="auth-b">JWT</span></div><div class="ad">Update: status, priority, assignee_id, contractor_id, note. Logs ComplaintUpdate row. On resolved: stamps resolved_at, recalculates compliance_score.</div></div>
+      <div class="ar"><div><span class="am mp">POST</span><span class="ap">/api/complaints/{id}/rate</span><span class="auth-b">JWT</span></div><div class="ad">Citizen rates 1–5. Only reporter can rate their own complaint. 400 if out of range.</div></div>
+      <div class="tip" style="margin-top:14px"><strong>ComplaintCreate body:</strong> title, description?, category, latitude?, longitude?, address?, image_url?, ward_id?<br><strong>ComplaintUpdate body:</strong> status?, priority?, assignee_id?, contractor_id?, note?</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GUIDE ══════════════════════════════════════════════════════════════ -->
+<div id="guide" class="panel">
+  <div class="section-title">User Guide</div>
+  <div class="section-sub">Step-by-step instructions for each role</div>
+  <div class="grid2">
+    <div class="card" style="border-color:rgba(79,142,247,.4)">
+      <h3 style="color:var(--accent)">👤 Citizen</h3>
+      <div class="gs"><div class="gn">1</div><div class="gb"><h4>Log in</h4><p>Open <code>http://localhost:3000</code>. Click <b>👤 Citizen</b> quick-fill button, then Sign In. Password: <code>demo1234</code></p></div></div>
+      <div class="gs"><div class="gn">2</div><div class="gb"><h4>Report a problem</h4><p>Click <b>+ Report Issue</b>. Fill in title and description — AI auto-classifies category and sets priority. Add location if known.</p></div></div>
+      <div class="gs"><div class="gn">3</div><div class="gb"><h4>Track your reports</h4><p>Click <b>My Reports</b> to see all submitted complaints, their status and SLA deadline countdown.</p></div></div>
+      <div class="gs"><div class="gn">4</div><div class="gb"><h4>Rate the resolution</h4><p>When a complaint shows <span style="color:var(--green)">RESOLVED</span>, click Rate and choose 1–5 stars. This feeds contractor compliance scores.</p></div></div>
+      <div class="gs"><div class="gn">5</div><div class="gb"><h4>Browse Ward Map</h4><p>Click <b>Ward Map</b> to see active issues pinned on the Bengaluru map.</p></div></div>
+    </div>
+    <div class="card" style="border-color:rgba(34,197,94,.4)">
+      <h3 style="color:var(--green)">🔧 Field Officer</h3>
+      <div class="gs"><div class="gn">1</div><div class="gb"><h4>Log in</h4><p>Use <b>🔧 Field Officer</b> quick-fill. You'll land on <b>My Tasks</b> — complaints assigned specifically to you.</p></div></div>
+      <div class="gs"><div class="gn">2</div><div class="gb"><h4>Start working</h4><p>Open a complaint → change status to <span style="color:var(--orange);font-weight:600">IN PROGRESS</span> + add a note describing the action.</p></div></div>
+      <div class="gs"><div class="gn">3</div><div class="gb"><h4>Mark resolved</h4><p>Once work is complete → status <span style="color:var(--green);font-weight:600">RESOLVED</span>. This stamps <code>resolved_at</code> and updates the contractor's compliance score.</p></div></div>
+      <div class="gs"><div class="gn">4</div><div class="gb"><h4>Watch SLA</h4><p><code>sla_deadline</code> is shown per ticket. Resolve before it to avoid escalation to Ward Officer.</p></div></div>
+    </div>
+    <div class="card" style="border-color:rgba(249,115,22,.4)">
+      <h3 style="color:var(--orange)">🏛️ Ward Officer</h3>
+      <div class="gs"><div class="gn">1</div><div class="gb"><h4>Log in</h4><p>Use <b>🏛️ Ward Officer</b>. You see <b>Ward Issues</b> — all complaints in your ward.</p></div></div>
+      <div class="gs"><div class="gn">2</div><div class="gb"><h4>Assign field teams</h4><p>Open complaint → set <code>assignee_id</code> to a field officer. Status auto-moves to <span style="color:#eab308;font-weight:600">ASSIGNED</span>.</p></div></div>
+      <div class="gs"><div class="gn">3</div><div class="gb"><h4>Escalate SLA risks</h4><p>If a complaint approaches breach and unresolved → status to <span style="color:var(--red);font-weight:600">ESCALATED</span> + note for Commissioner.</p></div></div>
+      <div class="gs"><div class="gn">4</div><div class="gb"><h4>Monitor analytics</h4><p>Use Dashboard and Ward Map to spot blackspots and check contractor performance in your ward.</p></div></div>
+    </div>
+    <div class="card" style="border-color:rgba(124,92,216,.4)">
+      <h3 style="color:var(--accent2)">📊 Commissioner</h3>
+      <div class="gs"><div class="gn">1</div><div class="gb"><h4>Log in</h4><p>Use <b>📊 Commissioner</b>. The City Dashboard shows real-time city-wide KPIs.</p></div></div>
+      <div class="gs"><div class="gn">2</div><div class="gb"><h4>Monitor city health</h4><p>City stats: total/open complaints, resolved today, avg resolution hours, top category, wards with flood_risk ≥ 7.0.</p></div></div>
+      <div class="gs"><div class="gn">3</div><div class="gb"><h4>Review escalations</h4><p>Filter <b>All Issues</b> by <code>status=escalated</code>. Reassign contractors or ward officers. Force-close stale tickets.</p></div></div>
+      <div class="gs"><div class="gn">4</div><div class="gb"><h4>Contractor leaderboard</h4><p>Identify underperforming contractors (low compliance_score). Reassign their ward to higher-performing contractors.</p></div></div>
+      <div class="gs"><div class="gn">5</div><div class="gb"><h4>Ward Heatmap</h4><p>Per-ward open complaint count + risk scores. High flood_risk_score wards need proactive drain and waterlogging monitoring before monsoon.</p></div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>Demo Credentials (run <code>docker compose exec backend python seed.py</code> first)</h3>
+    <div class="dm">
+      <div class="dc"><div class="role">Citizen</div><code>citizen@demo.com</code><br><code>demo1234</code></div>
+      <div class="dc"><div class="role">Field Officer</div><code>field@demo.com</code><br><code>demo1234</code></div>
+      <div class="dc"><div class="role">Ward Officer</div><code>ward@demo.com</code><br><code>demo1234</code></div>
+      <div class="dc"><div class="role">Commissioner</div><code>commissioner@demo.com</code><br><code>demo1234</code></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div style="border-top:1px solid var(--border);padding-top:14px">Made with IBM Bob &nbsp;·&nbsp; NagaraAI Bengaluru Civic Intelligence Platform</div>
+</footer>
+
+<script>
+function show(id,btn){
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
+  document.querySelectorAll('#mainnav button').forEach(function(b){b.classList.remove('active')});
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>
