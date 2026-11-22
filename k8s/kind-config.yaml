@@ -1,0 +1,36 @@
+# kind-config.yaml — create a kind cluster with ingress-ready port mappings
+#
+# Usage:  kind create cluster --name nagaraai --config k8s/kind-config.yaml
+#
+# After the cluster is up, install the ingress controller:
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+#   kubectl wait --namespace ingress-nginx \
+#     --for=condition=ready pod \
+#     --selector=app.kubernetes.io/component=controller \
+#     --timeout=90s
+#
+# The app will then be reachable at http://localhost
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # HTTP — maps to NodePort 80 on the ingress controller
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      # HTTPS
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+      # NodePort for the frontend service (direct access without ingress)
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP

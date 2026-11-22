@@ -1,0 +1,647 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NagaraAI — Self-Hosting Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    color: #1f2328;
+    background: #ffffff;
+    padding: 32px 16px 48px;
+  }
+  .page { max-width: 760px; margin: 0 auto; }
+
+  /* Header */
+  .hero {
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+  .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.3px; }
+  .hero p { color: #57606a; margin-top: 6px; font-size: 14px; }
+  .badge {
+    display: inline-block;
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: #57606a;
+    margin-right: 6px;
+    margin-top: 10px;
+  }
+
+  /* TOC */
+  .toc {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 36px;
+  }
+  .toc h3 { font-size: 13px; font-weight: 600; color: #57606a; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
+  .toc ol { padding-left: 18px; }
+  .toc li { margin: 4px 0; }
+  .toc a { color: #3b82d4; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Sections */
+  .section { margin-bottom: 40px; }
+  .section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: #3b82d4;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Cards */
+  .card {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .card h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+
+  /* Code blocks */
+  pre {
+    background: #1f2328;
+    color: #e6edf3;
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 10px 0;
+    font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  }
+  code {
+    background: #f0f1f3;
+    color: #c0392b;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 13px;
+    font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  }
+  pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+  /* Callouts */
+  .callout {
+    border-left: 4px solid #3b82d4;
+    background: #eff6ff;
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  .callout.warn {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+  }
+  .callout.tip {
+    border-left-color: #10b981;
+    background: #ecfdf5;
+  }
+  .callout strong { display: block; margin-bottom: 4px; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13.5px;
+  }
+  th {
+    background: #f7f8fa;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border: 1px solid #e5e7eb;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  /* Checklist */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 5px 0; padding-left: 24px; position: relative; }
+  .checklist li::before {
+    content: "☐";
+    position: absolute; left: 0;
+    color: #57606a;
+    font-size: 15px;
+  }
+
+  /* Architecture diagram */
+  .arch {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin: 14px 0;
+    font-size: 13px;
+  }
+  .arch-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 6px 0; flex-wrap: wrap; }
+  .arch-box {
+    border: 1.5px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px 14px;
+    background: #fff;
+    font-weight: 600;
+    font-size: 12.5px;
+    min-width: 100px;
+    text-align: center;
+  }
+  .arch-box.blue { border-color: #3b82d4; color: #3b82d4; }
+  .arch-box.green { border-color: #10b981; color: #10b981; }
+  .arch-box.purple { border-color: #7c5cd8; color: #7c5cd8; }
+  .arch-box.orange { border-color: #f59e0b; color: #d97706; }
+  .arch-arrow { color: #57606a; font-size: 16px; }
+
+  .url-pill {
+    display: inline-block;
+    background: #3b82d4;
+    color: #fff;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 3px 4px;
+  }
+
+  .footer {
+    border-top: 1px solid #e5e7eb;
+    margin-top: 48px;
+    padding-top: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #57606a;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  
+  <div class="hero">
+    <h1>🏙️ NagaraAI — Self-Hosting Guide</h1>
+    <p>Bengaluru Civic Intelligence Platform · Step-by-step guide for complete beginners</p>
+    <div>
+      <span class="badge">React 18</span>
+      <span class="badge">FastAPI</span>
+      <span class="badge">PostgreSQL 16</span>
+      <span class="badge">Docker Compose</span>
+      <span class="badge">IBM watsonx.ai</span>
+    </div>
+  </div>
+
+  
+  <div class="toc">
+    <h3>Table of Contents</h3>
+    <ol>
+      <li><a href="#overview">What is NagaraAI?</a></li>
+      <li><a href="#arch">Architecture Overview</a></li>
+      <li><a href="#prereqs">Prerequisites — What to Install First</a></li>
+      <li><a href="#step1">Step 1 — Get the Code</a></li>
+      <li><a href="#step2">Step 2 — Configure Environment Variables</a></li>
+      <li><a href="#step3">Step 3 — Start All Services with Docker</a></li>
+      <li><a href="#step4">Step 4 — Seed the Database</a></li>
+      <li><a href="#step5">Step 5 — Open the App</a></li>
+      <li><a href="#logins">Demo Logins</a></li>
+      <li><a href="#watsonx">Step 6 — Enable IBM watsonx.ai (Optional)</a></li>
+      <li><a href="#manual">Alternative: Run Without Docker</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+      <li><a href="#api">API Reference</a></li>
+      <li><a href="#stop">Stopping &amp; Resetting</a></li>
+    </ol>
+  </div>
+
+  
+  <div class="section" id="overview">
+    <h2>What is NagaraAI?</h2>
+    <p>NagaraAI is a full-stack civic issue management platform designed for Bengaluru (and adaptable to any city). It lets citizens report problems like potholes and garbage, while ward officers, field officers, and commissioners track, dispatch, and analyse resolution in real time.</p>
+    <div class="card">
+      <h4>Who is this guide for?</h4>
+      <p>Absolute beginners. You do not need to know Python, React, or databases. You only need to be comfortable typing commands and following steps in order. Every step is explained in plain language.</p>
+    </div>
+  </div>
+
+  
+  <div class="section" id="arch">
+    <h2>Architecture Overview</h2>
+    <p>The app runs as three services that talk to each other over a private Docker network:</p>
+    <div class="arch">
+      <div class="arch-row">
+        <div class="arch-box blue">Browser<br /><small>You open this</small></div>
+        <span class="arch-arrow">↔</span>
+        <div class="arch-box green">Frontend<br /><small>React · port 3000</small></div>
+        <span class="arch-arrow">↔</span>
+        <div class="arch-box orange">Backend API<br /><small>FastAPI · port 8000</small></div>
+        <span class="arch-arrow">↔</span>
+        <div class="arch-box purple">Database<br /><small>PostgreSQL · port 5432</small></div>
+      </div>
+      <p style="margin-top:14px;color:#57606a;font-size:12.5px">All three containers start together with a single command. Docker handles the networking automatically.</p>
+    </div>
+  </div>
+
+  
+  <div class="section" id="prereqs">
+    <h2>Prerequisites — What to Install First</h2>
+    <p>You only need <strong>two things</strong> installed on your computer: <strong>Git</strong> and <strong>Docker Desktop</strong>. Everything else (Python, Node, PostgreSQL) runs inside Docker containers — you do not install them on your machine.</p>
+
+    <div class="card">
+      <h4>1 · Install Git</h4>
+      <p>Git lets you download the project code.</p>
+      <ul style="padding-left:18px;margin-top:6px">
+        <li><strong>Windows:</strong> Download from <a href="https://git-scm.com/download/win" style="color:#3b82d4">git-scm.com/download/win</a> → run installer → accept all defaults</li>
+        <li><strong>Mac:</strong> Open Terminal → type <code>git --version</code> → macOS will prompt you to install it automatically</li>
+        <li><strong>Linux (Ubuntu/Debian):</strong> <code>sudo apt-get install git</code></li>
+      </ul>
+      <p style="margin-top:8px;color:#57606a;font-size:13px">✅ Verify: open a terminal and run <code>git --version</code> — you should see a version number like <code>git version 2.44.0</code></p>
+    </div>
+
+    <div class="card">
+      <h4>2 · Install Docker Desktop</h4>
+      <p>Docker runs the entire app in isolated containers. It is the recommended and easiest way.</p>
+      <ul style="padding-left:18px;margin-top:6px">
+        <li><strong>Windows:</strong> Download from <a href="https://www.docker.com/products/docker-desktop" style="color:#3b82d4">docker.com/products/docker-desktop</a> → run installer → restart when prompted</li>
+        <li><strong>Mac:</strong> Same link above, choose "Mac with Apple Silicon" or "Mac with Intel Chip"</li>
+        <li><strong>Linux:</strong> Follow <a href="https://docs.docker.com/engine/install/" style="color:#3b82d4">docs.docker.com/engine/install</a> for your distro</li>
+      </ul>
+      <div class="callout warn">
+        <strong>⚠️ Windows users:</strong> Docker Desktop requires WSL 2 (Windows Subsystem for Linux). The installer will guide you through enabling it. If asked, restart your computer and re-run the Docker installer.
+      </div>
+      <p style="margin-top:8px;color:#57606a;font-size:13px">✅ Verify: open a terminal and run <code>docker --version</code> — you should see <code>Docker version 26.x.x</code> or similar</p>
+    </div>
+
+    <div class="callout tip">
+      <strong>💡 Tip:</strong> After installing Docker Desktop, make sure it is <strong>running</strong> (look for the Docker whale icon in your system tray/menu bar) before proceeding. Commands will fail if Docker is installed but not started.
+    </div>
+  </div>
+
+  
+  <div class="section" id="step1">
+    <h2><span class="step-num">1</span> Get the Code</h2>
+    <p>Open a terminal (PowerShell on Windows, Terminal on Mac/Linux) and run:</p>
+    <pre><code>git clone https://github.com/your-org/nagaraai.git
+cd nagaraai</code></pre>
+    <div class="callout">
+      <strong>📁 What you now have:</strong> A folder called <code>nagaraai</code> containing <code>backend/</code>, <code>frontend/</code>, and <code>docker-compose.yml</code>. All future commands must be run from inside this folder.
+    </div>
+    <p>If you already have the folder (downloaded as a ZIP), just <code>cd</code> into it:</p>
+    <pre><code>cd path/to/nagaraai</code></pre>
+  </div>
+
+  
+  <div class="section" id="step2">
+    <h2><span class="step-num">2</span> Configure Environment Variables</h2>
+    <p>The backend needs a small configuration file called <code>.env</code>. Create it by copying the example:</p>
+
+    <div class="card">
+      <h4>Windows (PowerShell)</h4>
+      <pre><code>copy backend\.env.example backend\.env</code></pre>
+    </div>
+    <div class="card">
+      <h4>Mac / Linux</h4>
+      <pre><code>cp backend/.env.example backend/.env</code></pre>
+    </div>
+
+    <p style="margin-top:12px">Now open <code>backend/.env</code> in any text editor (Notepad, VS Code, etc.) and check these values:</p>
+
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Default Value</th><th>What to do</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>DATABASE_URL</code></td><td><code>postgresql://nagaraai:nagaraai123@db:5432/nagaraai_db</code></td><td>Leave as-is (Docker handles this)</td></tr>
+        <tr><td><code>SECRET_KEY</code></td><td><code>your-super-secret-key…</code></td><td><strong>Change to any long random string</strong> for security</td></tr>
+        <tr><td><code>ALGORITHM</code></td><td><code>HS256</code></td><td>Leave as-is</td></tr>
+        <tr><td><code>ACCESS_TOKEN_EXPIRE_MINUTES</code></td><td><code>1440</code></td><td>Leave as-is (24-hour sessions)</td></tr>
+        <tr><td><code>WATSONX_API_KEY</code></td><td><em>empty</em></td><td>Leave blank for now — the app works without it</td></tr>
+        <tr><td><code>WATSONX_PROJECT_ID</code></td><td><em>empty</em></td><td>Leave blank for now</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip">
+      <strong>💡 Minimum viable setup:</strong> For a quick local test, you only need to change <code>SECRET_KEY</code>. Everything else works with the defaults.
+    </div>
+  </div>
+
+  
+  <div class="section" id="step3">
+    <h2><span class="step-num">3</span> Start All Services with Docker</h2>
+    <p>Make sure Docker Desktop is running, then in your terminal (inside the <code>nagaraai</code> folder), run:</p>
+    <pre><code>docker compose up --build</code></pre>
+
+    <div class="callout">
+      <strong>What this does:</strong> Docker reads <code>docker-compose.yml</code> and:
+      <ul style="padding-left:18px;margin-top:6px">
+        <li>Downloads the PostgreSQL 16 image (~80 MB, one-time)</li>
+        <li>Builds the Python/FastAPI backend image</li>
+        <li>Builds the React frontend image</li>
+        <li>Starts all three containers and connects them on a private network</li>
+      </ul>
+    </div>
+
+    <div class="callout warn">
+      <strong>⏳ First run takes 3–8 minutes</strong> because Docker downloads and builds everything. Subsequent starts take under 30 seconds.
+    </div>
+
+    <p>You know it worked when you see output like:</p>
+    <pre><code>nagaraai_backend  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+nagaraai_frontend | Compiled successfully!
+nagaraai_frontend | 
+nagaraai_frontend | You can now view nagaraai-frontend in the browser.
+nagaraai_frontend |   Local:  http://localhost:3000</code></pre>
+
+    <p>Keep this terminal window open while you use the app. To run in the background instead, add <code>-d</code>:</p>
+    <pre><code>docker compose up --build -d</code></pre>
+  </div>
+
+  
+  <div class="section" id="step4">
+    <h2><span class="step-num">4</span> Seed the Database</h2>
+    <p>The database starts empty. Run this <strong>one-time</strong> command to populate it with Bengaluru wards, contractors, and four demo user accounts:</p>
+    <pre><code>docker compose exec backend python seed.py</code></pre>
+
+    <p>You should see:</p>
+    <pre><code>✅ Database seeded successfully.
+
+Demo logins:
+  Citizen:        citizen@demo.com / demo1234
+  Field Officer:  field@demo.com / demo1234
+  Ward Officer:   ward@demo.com / demo1234
+  Commissioner:   commissioner@demo.com / demo1234</code></pre>
+
+    <div class="callout tip">
+      <strong>💡 This command is safe to run multiple times</strong> — it checks for existing records and only inserts missing ones, so running it again will not create duplicates.
+    </div>
+  </div>
+
+  
+  <div class="section" id="step5">
+    <h2><span class="step-num">5</span> Open the App</h2>
+    <p>Open your web browser and go to these URLs:</p>
+    <div style="margin:14px 0">
+      <span class="url-pill">🌐 App → http://localhost:3000</span>
+      <span class="url-pill">📡 API Docs → http://localhost:8000/docs</span>
+      <span class="url-pill">❤️ Health → http://localhost:8000/health</span>
+    </div>
+    <div class="card">
+      <h4>What each URL shows</h4>
+      <table style="margin:0">
+        <thead><tr><th>URL</th><th>What you see</th></tr></thead>
+        <tbody>
+          <tr><td><code>http://localhost:3000</code></td><td>The main React app — login screen, dashboard, complaint map</td></tr>
+          <tr><td><code>http://localhost:8000/docs</code></td><td>Swagger UI — interactive API explorer, test endpoints directly in the browser</td></tr>
+          <tr><td><code>http://localhost:8000/health</code></td><td>Quick check: returns <code>{"status":"ok","service":"NagaraAI"}</code> if backend is healthy</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  
+  <div class="section" id="logins">
+    <h2>Demo Logins</h2>
+    <p>Four roles are pre-seeded. Each sees a different view of the same app:</p>
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Email</th><th>Password</th><th>What they can do</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>👤 Citizen</td><td><code>citizen@demo.com</code></td><td><code>demo1234</code></td><td>Report issues, track status, rate resolutions</td></tr>
+        <tr><td>🔧 Field Officer</td><td><code>field@demo.com</code></td><td><code>demo1234</code></td><td>View assigned tasks, update status on-the-go</td></tr>
+        <tr><td>🏢 Ward Officer</td><td><code>ward@demo.com</code></td><td><code>demo1234</code></td><td>Heat map, dispatch field officers, SLA tracking</td></tr>
+        <tr><td>📊 Commissioner</td><td><code>commissioner@demo.com</code></td><td><code>demo1234</code></td><td>City-wide KPIs, contractor compliance, flood risk</td></tr>
+      </tbody>
+    </table>
+    <div class="callout tip">
+      <strong>💡 Tip:</strong> Log in as <strong>Commissioner</strong> first to see the most complete dashboard. Then try <strong>Citizen</strong> to file a complaint and watch it get classified by AI.
+    </div>
+  </div>
+
+  
+  <div class="section" id="watsonx">
+    <h2><span class="step-num">6</span> Enable IBM watsonx.ai (Optional)</h2>
+    <p>By default, NagaraAI uses a built-in rule-based classifier that works with zero external credentials. To unlock full AI classification (Granite-13B LLM for Kannada/English NLP, priority scoring, and SLA suggestions), connect IBM watsonx.ai:</p>
+
+    <div class="card">
+      <h4>Step A — Get IBM Cloud credentials</h4>
+      <ol style="padding-left:18px;margin-top:6px">
+        <li>Create a free account at <a href="https://cloud.ibm.com/registration" style="color:#3b82d4">cloud.ibm.com/registration</a></li>
+        <li>Go to <strong>IBM watsonx</strong> → create a project</li>
+        <li>Navigate to <strong>Manage → General → Project ID</strong> — copy this value</li>
+        <li>Go to <strong>IBM Cloud → Manage → Access (IAM) → API Keys</strong> → create a new API key — copy it</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h4>Step B — Add credentials to <code>backend/.env</code></h4>
+      <pre><code>WATSONX_API_KEY=your-actual-api-key-here
+WATSONX_PROJECT_ID=your-actual-project-id-here
+WATSONX_URL=https://us-south.ml.cloud.ibm.com</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>Step C — Restart the backend</h4>
+      <pre><code>docker compose restart backend</code></pre>
+    </div>
+
+    <table>
+      <thead><tr><th>Feature</th><th>Without watsonx</th><th>With watsonx</th></tr></thead>
+      <tbody>
+        <tr><td>Complaint classification</td><td>Rule-based keywords</td><td>Granite-13B LLM (Kannada + English)</td></tr>
+        <tr><td>Priority assignment</td><td>Fixed heuristics</td><td>AI-scored (low/medium/high/critical)</td></tr>
+        <tr><td>Summary generation</td><td>Not available</td><td>Plain-language AI summary</td></tr>
+        <tr><td>SLA deadline</td><td>Category defaults</td><td>AI-suggested based on severity</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  
+  <div class="section" id="manual">
+    <h2>Alternative: Run Without Docker</h2>
+    <p>If you cannot use Docker, you can run each service manually. This requires Python 3.12+, Node 20+, and a local PostgreSQL 16+ installation.</p>
+
+    <div class="card">
+      <h4>Backend (FastAPI)</h4>
+      <pre><code>cd nagaraai/backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate it
+venv\Scripts\activate          # Windows PowerShell
+source venv/bin/activate       # Mac / Linux
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+copy .env.example .env         # Windows
+cp .env.example .env           # Mac/Linux
+# Edit .env — set DATABASE_URL to your local PostgreSQL connection string
+
+# Create tables + demo data
+python seed.py
+
+# Start the API server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>Frontend (React)</h4>
+      <pre><code>cd nagaraai/frontend
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm start</code></pre>
+    </div>
+
+    <div class="callout warn">
+      <strong>⚠️ DATABASE_URL for manual setup:</strong> Change the host from <code>db</code> (Docker service name) to <code>localhost</code>:
+      <pre style="margin-top:6px"><code>DATABASE_URL=postgresql://nagaraai:nagaraai123@localhost:5432/nagaraai_db</code></pre>
+    </div>
+  </div>
+
+  
+  <div class="section" id="trouble">
+    <h2>Troubleshooting</h2>
+
+    <div class="card">
+      <h4>❌ "Cannot connect to the Docker daemon" or "docker: command not found"</h4>
+      <p>Docker Desktop is not running. Open Docker Desktop from your Start Menu / Applications folder and wait for it to fully start (the whale icon in the taskbar/menu bar turns steady, not animating).</p>
+    </div>
+
+    <div class="card">
+      <h4>❌ Port 3000 or 8000 already in use</h4>
+      <p>Another program is using that port. Find and stop it, or change the port in <code>docker-compose.yml</code>:</p>
+      <pre><code>ports:
+  - "3001:3000"   # Change left number to any free port</code></pre>
+      <p>Then access the app at <code>http://localhost:3001</code> instead.</p>
+    </div>
+
+    <div class="card">
+      <h4>❌ Frontend shows "Network Error" or blank data</h4>
+      <p>The backend might still be starting. Wait 10–15 seconds and refresh. If it persists:</p>
+      <pre><code>docker compose logs backend</code></pre>
+      <p>Look for red error lines. Common causes: wrong DATABASE_URL in <code>.env</code>, or the database container hasn't finished initialising.</p>
+    </div>
+
+    <div class="card">
+      <h4>❌ Seed command fails: "relation does not exist"</h4>
+      <p>The backend hasn't run yet (tables are created on first startup). Make sure the backend is running and healthy first:</p>
+      <pre><code>docker compose ps                        # all services should show "running"
+curl http://localhost:8000/health        # should return {"status":"ok"}</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>❌ Changes to <code>.env</code> not taking effect</h4>
+      <p>Environment variable changes require a container restart:</p>
+      <pre><code>docker compose down
+docker compose up --build</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>🔍 View logs for a specific service</h4>
+      <pre><code>docker compose logs backend      # backend logs
+docker compose logs frontend     # frontend logs
+docker compose logs db           # database logs
+docker compose logs -f backend   # follow/live-stream logs</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>🔍 Check which containers are running</h4>
+      <pre><code>docker compose ps</code></pre>
+      <p>All three services (<code>nagaraai_db</code>, <code>nagaraai_backend</code>, <code>nagaraai_frontend</code>) should show status <strong>Up</strong>.</p>
+    </div>
+  </div>
+
+  
+  <div class="section" id="api">
+    <h2>API Reference</h2>
+    <p>The full interactive API documentation is at <strong>http://localhost:8000/docs</strong> (Swagger UI). Quick reference:</p>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST</code></td><td><code>/api/auth/register</code></td><td>Register a new user</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/auth/login</code></td><td>Login → returns JWT token</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/auth/me</code></td><td>Get current logged-in user</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/complaints/</code></td><td>File a complaint (AI classifies)</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/complaints/</code></td><td>List complaints (role-scoped)</td></tr>
+        <tr><td><code>PATCH</code></td><td><code>/api/complaints/{id}</code></td><td>Update status or assign officer</td></tr>
+        <tr><td><code>POST</code></td><td><code>/api/complaints/{id}/rate</code></td><td>Citizen rates a resolution</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/analytics/city</code></td><td>City-wide KPIs</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/analytics/ward-heatmap</code></td><td>Per-ward risk scores</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/analytics/contractors</code></td><td>Contractor compliance leaderboard</td></tr>
+        <tr><td><code>GET</code></td><td><code>/api/wards/</code></td><td>List all wards</td></tr>
+        <tr><td><code>GET</code></td><td><code>/health</code></td><td>Service health check</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  
+  <div class="section" id="stop">
+    <h2>Stopping &amp; Resetting</h2>
+
+    <div class="card">
+      <h4>Stop the app (keep data)</h4>
+      <pre><code>docker compose down</code></pre>
+      <p>Containers stop but the database volume (<code>pgdata</code>) is preserved. Next <code>docker compose up</code> resumes where you left off.</p>
+    </div>
+
+    <div class="card">
+      <h4>Full reset (delete everything including data)</h4>
+      <pre><code>docker compose down -v</code></pre>
+      <p>The <code>-v</code> flag deletes the database volume. After this, you must run <code>python seed.py</code> again to repopulate demo data.</p>
+    </div>
+
+    <div class="card">
+      <h4>Rebuild after code changes</h4>
+      <pre><code>docker compose up --build</code></pre>
+      <p>Forces Docker to rebuild images. Required after changing <code>requirements.txt</code>, <code>package.json</code>, or Dockerfiles.</p>
+    </div>
+
+    <div class="card">
+      <h4>Pre-flight checklist before starting</h4>
+      <ul class="checklist">
+        <li>Docker Desktop is installed and running</li>
+        <li>You are inside the <code>nagaraai/</code> folder in your terminal</li>
+        <li><code>backend/.env</code> file exists (copied from <code>.env.example</code>)</li>
+        <li>Ports 3000, 8000, and 5432 are not used by other apps</li>
+        <li>You have ~500 MB free disk space for Docker images</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer">Made with IBM Bob</div>
+</div>
+</body>
+</html>

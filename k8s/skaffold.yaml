@@ -1,0 +1,58 @@
+# skaffold.yaml — dev loop for minikube and kind
+#
+# Usage:
+#   minikube:  eval $(minikube docker-env) && skaffold dev
+#   kind:       skaffold dev --default-repo ""   (kind auto-loads images)
+#
+# Requirements:  skaffold v2+  (https://skaffold.dev/docs/install/)
+
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: nagaraai
+
+build:
+  artifacts:
+    - image: nagaraai-backend
+      context: backend
+      docker:
+        dockerfile: Dockerfile
+
+    - image: nagaraai-frontend
+      context: frontend
+      docker:
+        dockerfile: Dockerfile.k8s   # production build, not the dev-server Dockerfile
+
+  # minikube: build images directly inside the cluster VM (no registry needed)
+  # Uncomment the block for kind if you prefer to push to a local registry.
+  local:
+    push: false
+
+deploy:
+  kubectl:
+    defaultNamespace: nagaraai
+    manifests:
+      - k8s/namespace.yaml
+      - k8s/secrets/secrets.yaml
+      - k8s/postgres/pvc.yaml
+      - k8s/postgres/deployment.yaml
+      - k8s/postgres/service.yaml
+      - k8s/backend/deployment.yaml
+      - k8s/backend/service.yaml
+      - k8s/frontend/deployment.yaml
+      - k8s/frontend/service.yaml
+      - k8s/ingress/ingress.yaml
+
+portForward:
+  # Convenience: forward the frontend to localhost:3000 when running skaffold dev
+  - resourceType: service
+    resourceName: frontend-svc
+    namespace: nagaraai
+    port: 3000
+    localPort: 3000
+  # Direct backend access for debugging / API calls
+  - resourceType: service
+    resourceName: backend-svc
+    namespace: nagaraai
+    port: 8000
+    localPort: 8000

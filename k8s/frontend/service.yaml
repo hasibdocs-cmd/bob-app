@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: nagaraai
+  labels:
+    app: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      # nodePort is used when type is NodePort (minikube tunnel alternative)
+      nodePort: 30080
+  type: NodePort

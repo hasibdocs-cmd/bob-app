@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: nagaraai
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # Wait for postgres to be ready before the first pod starts
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres-svc 5432; do
+                echo "waiting for postgres..."; sleep 2;
+              done
+      containers:
+        - name: backend
+          # minikube:  use the local image name you built with
+          #            eval $(minikube docker-env) && docker build -t nagaraai-backend:latest ./backend
+          # kind:       kind load docker-image nagaraai-backend:latest
+          image: nagaraai-backend:latest
+          imagePullPolicy: IfNotPresent   # use the locally-loaded image
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nagaraai-secrets
+                  key: DATABASE_URL
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nagaraai-secrets
+                  key: SECRET_KEY
+            - name: WATSONX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nagaraai-secrets
+                  key: WATSONX_API_KEY
+            - name: WATSONX_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: nagaraai-secrets
+                  key: WATSONX_PROJECT_ID
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

@@ -1,0 +1,41 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Ingress — routes all traffic through a single external IP/hostname
+#
+# minikube:  minikube addons enable ingress
+# kind:      kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+#
+# After applying, access the app at:
+#   minikube:  http://$(minikube ip)         or run: minikube tunnel → http://localhost
+#   kind:       http://localhost             (after kind extra port mapping, see README)
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nagaraai-ingress
+  namespace: nagaraai
+  annotations:
+    # No rewrite — the backend FastAPI app already registers /api/* routes.
+    # The frontend nginx proxy also passes /api/* intact to the backend service.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # /api/* → backend  (FastAPI registers routes as /api/auth, /api/complaints, …)
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8000
+          # /* → frontend (React SPA; nginx inside the pod handles /api proxy too)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 3000

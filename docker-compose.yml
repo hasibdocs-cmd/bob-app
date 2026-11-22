@@ -50,5 +50,18 @@ services:
     environment:
       REACT_APP_API_URL: http://localhost:8000
 
+  test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.test
+    container_name: nagaraai_test
+    environment:
+      DATABASE_URL: sqlite:///./test.db
+      SECRET_KEY: test-secret-key
+      WATSONX_API_KEY: ""
+      WATSONX_PROJECT_ID: ""
+    profiles:
+      - test
+
 volumes:
   pgdata:
