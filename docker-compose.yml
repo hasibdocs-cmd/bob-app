@@ -26,6 +26,33 @@ services:
       SECRET_KEY: change-me-in-production
       WATSONX_API_KEY: ${WATSONX_API_KEY:-}
       WATSONX_PROJECT_ID: ${WATSONX_PROJECT_ID:-}
+      APP_BASE_URL: ${APP_BASE_URL:-https://nagaraai.example.com}
+      # ── Twilio (WhatsApp / SMS / Voice) ──────────────────────────────────────
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      TWILIO_WHATSAPP_NUMBER: ${TWILIO_WHATSAPP_NUMBER:-}
+      TWILIO_VERIFY_SIGNATURE: ${TWILIO_VERIFY_SIGNATURE:-false}
+      # ── Telegram Bot ─────────────────────────────────────────────────────────
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      # ── SMTP Email ───────────────────────────────────────────────────────────
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-nagaraai@example.com}
+      # ── Meta (Facebook / Instagram) ──────────────────────────────────────────
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:-nagaraai-verify}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN:-}
+      META_IG_ACCESS_TOKEN: ${META_IG_ACCESS_TOKEN:-}
+      # ── Twitter/X ────────────────────────────────────────────────────────────
+      TWITTER_API_KEY: ${TWITTER_API_KEY:-}
+      TWITTER_API_SECRET: ${TWITTER_API_SECRET:-}
+      TWITTER_ACCESS_TOKEN: ${TWITTER_ACCESS_TOKEN:-}
+      TWITTER_ACCESS_SECRET: ${TWITTER_ACCESS_SECRET:-}
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN:-}
     ports:
       - "8000:8000"
     depends_on:

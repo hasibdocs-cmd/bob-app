@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import api from '../api';
 import toast from 'react-hot-toast';
 
+const CHANNELS = [
+  { value: 'web', label: '🌐 Web (this form)' },
+  { value: 'whatsapp', label: '💬 WhatsApp' },
+  { value: 'telegram', label: '✈️ Telegram' },
+  { value: 'sms', label: '📱 SMS' },
+  { value: 'email', label: '📧 Email' },
+];
+
 const CATEGORIES = [
   { value: 'garbage_black_spot', label: '🗑️ Garbage / Black Spot' },
   { value: 'cd_waste', label: '🧱 Construction & Demolition Waste' },
@@ -15,6 +23,7 @@ export default function ReportModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '', description: '', category: 'garbage_black_spot',
     address: '', latitude: '', longitude: '', image_url: '',
+    channel: 'web',
   });
   const [loading, setLoading] = useState(false);
 
@@ -98,6 +107,18 @@ export default function ReportModal({ onClose, onCreated }) {
           <div className="form-group">
             <label className="form-label">Image URL (optional)</label>
             <input className="form-control" placeholder="https://…" value={form.image_url} onChange={set('image_url')} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">📡 Reporting Channel</label>
+            <select className="form-control" value={form.channel} onChange={set('channel')}>
+              {CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            {form.channel !== 'web' && (
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                You can also report directly via {form.channel === 'whatsapp' ? 'WhatsApp' : form.channel === 'telegram' ? 'Telegram Bot' : form.channel === 'sms' ? 'SMS' : 'Email'} — NagaraAI will auto-classify your message.
+              </p>
+            )}
           </div>
 
           <div style={{ background: 'var(--accent-light)', borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 13, color: 'var(--accent)' }}>

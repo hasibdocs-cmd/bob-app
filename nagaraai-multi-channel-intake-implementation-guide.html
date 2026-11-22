@@ -1,0 +1,524 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NagaraAI — Multi-Channel Intake Guide</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #1f2328;
+    background: #fff;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  h2 { font-size: 16px; font-weight: 700; margin: 32px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #e5e7eb; }
+  h3 { font-size: 14px; font-weight: 700; margin: 20px 0 6px; color: #1f2328; }
+  h4 { font-size: 13px; font-weight: 600; margin: 14px 0 4px; color: #3b82d4; }
+  p { margin-bottom: 10px; color: #1f2328; }
+  .subtitle { color: #57606a; font-size: 13px; margin-bottom: 24px; }
+  .tag { display: inline-block; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 600; color: #57606a; margin-right: 4px; }
+  .tag-blue { background: #eff6ff; border-color: #bfdbfe; color: #3b82d4; }
+  .tag-green { background: #f0fdf4; border-color: #bbf7d0; color: #15803d; }
+  .tag-purple { background: #faf5ff; border-color: #e9d5ff; color: #7c5cd8; }
+  .tag-orange { background: #fff7ed; border-color: #fed7aa; color: #c2410c; }
+
+  /* Architecture box */
+  .arch {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  .arch-flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0;
+  }
+  .arch-box {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1f2328;
+    white-space: nowrap;
+  }
+  .arch-box.blue { border-color: #3b82d4; color: #3b82d4; background: #eff6ff; }
+  .arch-box.green { border-color: #15803d; color: #15803d; background: #f0fdf4; }
+  .arch-box.purple { border-color: #7c5cd8; color: #7c5cd8; background: #faf5ff; }
+  .arch-box.orange { border-color: #c2410c; color: #c2410c; background: #fff7ed; }
+  .arrow { color: #57606a; font-size: 16px; font-weight: 300; }
+
+  /* File table */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { text-align: left; font-weight: 600; padding: 7px 10px; background: #f7f8fa; border-bottom: 2px solid #e5e7eb; color: #57606a; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .file { font-family: "Cascadia Code", "Fira Code", "Consolas", monospace; font-size: 12px; color: #3b82d4; }
+
+  /* Code block */
+  pre {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+    font-size: 12px;
+    overflow-x: auto;
+    margin: 10px 0 16px;
+    line-height: 1.5;
+  }
+  code { font-family: "Cascadia Code", "Fira Code", "Consolas", monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 3px; padding: 1px 5px; }
+
+  /* Step list */
+  .step { display: flex; gap: 14px; margin-bottom: 14px; align-items: flex-start; }
+  .step-num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #3b82d4; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .step-body { flex: 1; }
+
+  /* Channel grid */
+  .channel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+  .channel-card {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .channel-card h4 { margin: 0 0 4px; font-size: 13px; color: #1f2328; }
+  .channel-card p { font-size: 12px; color: #57606a; margin: 0; }
+
+  /* Alert box */
+  .note {
+    background: #eff6ff;
+    border-left: 3px solid #3b82d4;
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: #1f2328;
+  }
+  .warn {
+    background: #fff7ed;
+    border-left: 3px solid #f97316;
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: #1f2328;
+  }
+
+  /* Test result pill */
+  .pill { display: inline-flex; align-items: center; gap: 5px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 600; color: #15803d; margin: 2px; }
+
+  /* Endpoint list */
+  .ep { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+  .ep:last-child { border-bottom: none; }
+  .method { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 3px; min-width: 42px; text-align: center; }
+  .get { background: #eff6ff; color: #3b82d4; }
+  .post { background: #f0fdf4; color: #15803d; }
+  .ep-path { font-family: monospace; font-size: 12px; color: #1f2328; }
+  .ep-desc { color: #57606a; font-size: 12px; margin-left: auto; }
+
+  .divider { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0; }
+  .footer { text-align: center; color: #57606a; font-size: 12px; padding-top: 20px; border-top: 1px solid #e5e7eb; margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<h1>NagaraAI — Multi-Channel Intake</h1>
+<p class="subtitle">Implementation guide · November 2026 · <span class="tag tag-green">75 tests passing</span> <span class="tag tag-blue">9 channels</span> <span class="tag tag-purple">IBM watsonx.ai</span></p>
+
+
+<h2>1. What Was Built</h2>
+<p>
+  NagaraAI now accepts civic complaints from <strong>9 external channels</strong> in addition to the web portal.
+  Citizens can report issues by texting WhatsApp, sending an SMS/MMS, calling a voice number, messaging on
+  Telegram, Facebook, Instagram, Twitter/X, or emailing — in any language, with photos, videos, or voice
+  recordings. Every inbound message is automatically classified by <strong>IBM watsonx.ai Granite-13B</strong>
+  (falling back to a local rule-based classifier) and an acknowledgement is sent back on the same channel.
+</p>
+
+<div class="arch">
+  <strong>End-to-end message flow</strong>
+  <div class="arch-flow">
+    <div class="arch-box blue">Citizen (any channel)</div>
+    <span class="arrow">→</span>
+    <div class="arch-box">Platform webhook</div>
+    <span class="arrow">→</span>
+    <div class="arch-box blue">Channel Adapter</div>
+    <span class="arrow">→</span>
+    <div class="arch-box purple">Dispatcher</div>
+    <span class="arrow">→</span>
+    <div class="arch-box purple">watsonx.ai</div>
+  </div>
+  <div class="arch-flow">
+    <div class="arch-box green">DB: InboundMessage</div>
+    <span class="arrow">+</span>
+    <div class="arch-box green">MediaAttachment</div>
+    <span class="arrow">→</span>
+    <div class="arch-box orange">ACK back to citizen</div>
+    <span class="arrow">→</span>
+    <div class="arch-box">Staff promote → Complaint</div>
+  </div>
+</div>
+
+
+<h2>2. Files Created / Changed</h2>
+
+<h3>New files</h3>
+<table>
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td class="file">backend/app/channels/__init__.py</td><td>Package marker</td></tr>
+  <tr><td class="file">backend/app/channels/whatsapp.py</td><td>Twilio WhatsApp Business API — inbound signature verify + outbound send</td></tr>
+  <tr><td class="file">backend/app/channels/sms.py</td><td>Twilio SMS/MMS — send_sms(), send_mms()</td></tr>
+  <tr><td class="file">backend/app/channels/voice.py</td><td>Twilio Voice TwiML IVR — greeting, record, transcribe callback</td></tr>
+  <tr><td class="file">backend/app/channels/telegram.py</td><td>Telegram Bot API — send_telegram(), verify_telegram_secret(), set_webhook()</td></tr>
+  <tr><td class="file">backend/app/channels/email_chan.py</td><td>SMTP outbound (send_email) + RFC 2822 inbound parser</td></tr>
+  <tr><td class="file">backend/app/channels/social.py</td><td>Facebook/Instagram Graph API + Twitter/X DM — verify, parse, send</td></tr>
+  <tr><td class="file">backend/app/channels/dispatcher.py</td><td><strong>Central AI dispatcher</strong> — orchestrates all inbound messages</td></tr>
+  <tr><td class="file">backend/app/routes/channels.py</td><td>FastAPI router — 11 webhook + 3 management endpoints</td></tr>
+  <tr><td class="file">backend/tests/test_channels.py</td><td>18 pytest tests for dispatcher + all webhook endpoints</td></tr>
+</table>
+
+<h3>Modified files</h3>
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td class="file">backend/app/models.py</td><td>Added ChannelType, MediaType enums; InboundMessage, MediaAttachment, ChannelDispatch ORM models with relationships on Complaint</td></tr>
+  <tr><td class="file">backend/app/schemas.py</td><td>Added MediaAttachmentOut, InboundMessageOut, ChannelDispatchOut, DispatchRequest, TwilioWebhookPayload, TelegramUpdate, MetaWebhookPayload</td></tr>
+  <tr><td class="file">backend/app/config.py</td><td>Added 30+ channel env vars — Twilio, Telegram, SMTP, Meta, Twitter/X, APP_BASE_URL</td></tr>
+  <tr><td class="file">backend/app/watsonx.py</td><td>Added analyze_media() and transcribe_voice() stubs</td></tr>
+  <tr><td class="file">backend/app/main.py</td><td>Registered channels router</td></tr>
+  <tr><td class="file">backend/requirements.txt</td><td>Added twilio==9.0.4, requests-oauthlib==1.3.1</td></tr>
+  <tr><td class="file">frontend/src/components/ReportModal.js</td><td>Added 📡 Reporting Channel selector (Web/WhatsApp/Telegram/SMS/Email)</td></tr>
+  <tr><td class="file">frontend/src/components/ComplaintDetail.js</td><td>Added 📣 Send Notification panel for officers (channel picker + recipient input)</td></tr>
+  <tr><td class="file">docker-compose.yml</td><td>Added all 20+ channel env vars with ${VAR:-} defaults for the backend service</td></tr>
+</table>
+
+
+<h2>3. Database Schema — New Tables</h2>
+
+<h3>inbound_messages</h3>
+<p>Every incoming message from every channel is stored here before it becomes a formal Complaint. Staff can review, merge, or promote these records.</p>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+  <tr><td><code>id</code></td><td>Integer PK</td><td></td></tr>
+  <tr><td><code>channel</code></td><td>Enum ChannelType</td><td>whatsapp / telegram / sms / mms / email / voice / facebook / instagram / twitter_x / web / api</td></tr>
+  <tr><td><code>external_id</code></td><td>String</td><td>Platform message ID (Twilio SID, update_id, tweet id…)</td></tr>
+  <tr><td><code>sender_id</code></td><td>String</td><td>Phone number, email, chat_id, or handle</td></tr>
+  <tr><td><code>raw_text</code></td><td>Text</td><td>Original message body</td></tr>
+  <tr><td><code>ai_transcript</code></td><td>Text</td><td>Voice → text (from Twilio transcription callback)</td></tr>
+  <tr><td><code>ai_category / ai_priority / ai_confidence / ai_summary</code></td><td>Various</td><td>watsonx.ai classification results</td></tr>
+  <tr><td><code>latitude / longitude / location_text</code></td><td>Float / String</td><td>Location if provided by channel</td></tr>
+  <tr><td><code>complaint_id</code></td><td>FK → complaints</td><td>Set when staff promotes to a Complaint</td></tr>
+  <tr><td><code>is_processed</code></td><td>Boolean</td><td>False until a Complaint is created</td></tr>
+  <tr><td><code>metadata_</code></td><td>JSON</td><td>Raw platform-specific data</td></tr>
+</table>
+
+<h3>media_attachments</h3>
+<p>Images, videos, audio, or documents attached to an InboundMessage.</p>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+  <tr><td><code>message_id</code></td><td>FK → inbound_messages</td><td>Cascade delete</td></tr>
+  <tr><td><code>media_type</code></td><td>Enum MediaType</td><td>image / video / audio / document / location</td></tr>
+  <tr><td><code>url</code></td><td>String</td><td>Public URL or platform file ID</td></tr>
+  <tr><td><code>mime_type</code></td><td>String</td><td>e.g. image/jpeg</td></tr>
+  <tr><td><code>ai_description</code></td><td>Text</td><td>Future: AI image caption / audio transcript</td></tr>
+</table>
+
+<h3>channel_dispatches</h3>
+<p>Outbound notifications sent from NagaraAI back to citizens. Created by the <code>POST /api/channels/dispatch</code> endpoint.</p>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+  <tr><td><code>complaint_id</code></td><td>FK → complaints</td><td></td></tr>
+  <tr><td><code>channel</code></td><td>Enum ChannelType</td><td></td></tr>
+  <tr><td><code>recipient</code></td><td>String</td><td>Phone / email / chat_id</td></tr>
+  <tr><td><code>message_body</code></td><td>Text</td><td>Auto-generated from complaint if not supplied</td></tr>
+  <tr><td><code>external_id</code></td><td>String</td><td>Platform send ID (Twilio SID, message_id…)</td></tr>
+  <tr><td><code>status</code></td><td>String</td><td>queued | sent | delivered | failed</td></tr>
+</table>
+
+
+<h2>4. The Central Dispatcher — How It Works</h2>
+<p>
+  <span class="file">backend/app/channels/dispatcher.py</span> is the single function every webhook handler calls.
+  It is channel-agnostic: it takes a normalised set of fields and handles everything else.
+</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <strong>AI Classification</strong><br />
+    Calls <code>classify_with_watsonx(text)</code>. If <code>WATSONX_API_KEY</code> is set, it hits the
+    IBM watsonx.ai Granite-13B model. Otherwise it runs the local keyword-based fallback.
+    Returns <code>category</code>, <code>priority</code>, <code>confidence</code>, <code>summary</code>.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <strong>Persist InboundMessage</strong><br />
+    Writes the message to the <code>inbound_messages</code> table including all AI fields.
+    Uses <code>db.flush()</code> to get the new ID before inserting child records.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <strong>Persist MediaAttachments</strong><br />
+    Loops over the <code>attachments</code> list. Each item needs <code>{media_type, url}</code>.
+    <code>media_type</code> can be an enum value or a plain string — both are accepted.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-body">
+    <strong>Send Acknowledgement</strong><br />
+    Fires an async <code>_send_ack()</code> which picks the right outbound sender for the channel.
+    Errors in ack sending are logged as warnings and never raise — they don't fail the main pipeline.
+    Voice channel skips this step (<code>send_ack=False</code>) because TwiML already plays a <code>&lt;Say&gt;</code>.
+  </div>
+</div>
+
+<pre>msg = await dispatch_inbound(
+    db=db,
+    channel=ChannelType.whatsapp,
+    sender_id="+919876543210",
+    raw_text="Garbage pile near MG Road bus stop",
+    attachments=[{"media_type": "image", "url": "https://…/photo.jpg"}],
+    metadata={"MessageSid": "SM1234"},
+)</pre>
+
+
+<h2>5. Channel Adapters</h2>
+<div class="channel-grid">
+  <div class="channel-card">
+    <h4>💬 WhatsApp — whatsapp.py</h4>
+    <p>Uses Twilio WhatsApp Business API. Inbound webhook is form-encoded. Signature verified via HMAC using <code>TWILIO_AUTH_TOKEN</code>. Set <code>TWILIO_VERIFY_SIGNATURE=false</code> for local dev.</p>
+  </div>
+  <div class="channel-card">
+    <h4>📱 SMS / MMS — sms.py</h4>
+    <p>Also uses Twilio. Same signature verification flow. Auto-detects MMS when <code>NumMedia &gt; 0</code>. MMS media URLs extracted by index (<code>MediaUrl0</code>, <code>MediaUrl1</code>…).</p>
+  </div>
+  <div class="channel-card">
+    <h4>📞 Voice — voice.py</h4>
+    <p>Returns TwiML on inbound call: greets in English (Indian accent), records up to 120 seconds with Twilio transcription enabled. Transcription is POSTed to <code>/webhook/voice/transcription</code>.</p>
+  </div>
+  <div class="channel-card">
+    <h4>✈️ Telegram — telegram.py</h4>
+    <p>Telegram Bot API. Webhook secured with <code>X-Telegram-Bot-Api-Secret-Token</code> header. Supports photos (largest size), video, audio, document. File IDs stored as <code>tg://file/&lt;id&gt;</code> URIs.</p>
+  </div>
+  <div class="channel-card">
+    <h4>📧 Email — email_chan.py</h4>
+    <p>Outbound via SMTP (TLS). Inbound via JSON webhook (compatible with SendGrid Inbound Parse / Mailgun). Also includes an RFC 2822 raw email parser for direct MTA integration.</p>
+  </div>
+  <div class="channel-card">
+    <h4>👍 Facebook — social.py</h4>
+    <p>Meta Graph API webhooks. Subscription verified via GET hub challenge. Inbound payload verified with HMAC-SHA256 (<code>X-Hub-Signature-256</code>). Outbound via <code>/me/messages</code>.</p>
+  </div>
+  <div class="channel-card">
+    <h4>📸 Instagram — social.py</h4>
+    <p>Identical webhook format to Facebook. Uses separate <code>META_IG_ACCESS_TOKEN</code> for outbound DMs. Shares the same <code>META_VERIFY_TOKEN</code> for hub challenge.</p>
+  </div>
+  <div class="channel-card">
+    <h4>🐦 Twitter/X — social.py</h4>
+    <p>Account Activity API (v2). Inbound tweet events parsed from <code>tweet_create_events</code>. Outbound DMs use OAuth1 via <code>requests-oauthlib</code>.</p>
+  </div>
+</div>
+
+<div class="note">
+  <strong>All adapters are safe to run unconfigured.</strong> Every outbound sender checks for required credentials first and logs an info-level skip instead of raising. This means tests run with zero external credentials and production can enable channels one by one.
+</div>
+
+
+<h2>6. API Endpoints — /api/channels</h2>
+
+<h3>Inbound Webhook Endpoints (no auth required — platform-verified)</h3>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/whatsapp</span><span class="ep-desc">Twilio WhatsApp form-encoded</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/sms</span><span class="ep-desc">Twilio SMS/MMS form-encoded</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/voice</span><span class="ep-desc">Returns TwiML to record caller</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/voice/transcription</span><span class="ep-desc">Twilio transcription callback</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/telegram</span><span class="ep-desc">Telegram Update JSON object</span></div>
+<div class="ep"><span class="method get">GET</span><span class="ep-path">/api/channels/webhook/facebook</span><span class="ep-desc">Meta hub challenge verification</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/facebook</span><span class="ep-desc">Meta messaging events (Messenger)</span></div>
+<div class="ep"><span class="method get">GET</span><span class="ep-path">/api/channels/webhook/instagram</span><span class="ep-desc">Meta hub challenge verification</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/instagram</span><span class="ep-desc">Meta messaging events (Instagram DM)</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/twitter</span><span class="ep-desc">Twitter Account Activity API events</span></div>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/webhook/email</span><span class="ep-desc">JSON: {from, subject, body, attachments?}</span></div>
+
+<h3>Management Endpoints (JWT Bearer required)</h3>
+<div class="ep"><span class="method post">POST</span><span class="ep-path">/api/channels/dispatch</span><span class="ep-desc">Send outbound notification on any channel</span></div>
+<div class="ep"><span class="method get">GET</span><span class="ep-path">/api/channels/inbound</span><span class="ep-desc">List inbound messages (filterable by channel)</span></div>
+<div class="ep"><span class="method get">GET</span><span class="ep-path">/api/channels/dispatch/{id}</span><span class="ep-desc">Check dispatch status</span></div>
+
+<h3>Dispatch Request body</h3>
+<pre>{
+  "complaint_id": 42,
+  "channel": "whatsapp",           // whatsapp | sms | telegram | email | facebook | instagram | twitter_x
+  "recipient": "+919876543210",    // phone / email / chat_id
+  "message_body": "Optional custom text — auto-generated from complaint if omitted"
+}</pre>
+
+
+<h2>7. Environment Variables</h2>
+<p>All variables are optional — the platform gracefully degrades if not set. Add them to your <code>.env</code> file or <code>docker-compose.yml</code>.</p>
+
+<h3>Twilio (WhatsApp / SMS / Voice)</h3>
+<pre>TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_PHONE_NUMBER=+14155238886          # for SMS/Voice
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886  # for WhatsApp
+TWILIO_VERIFY_SIGNATURE=true             # set false for local dev</pre>
+
+<h3>Telegram</h3>
+<pre>TELEGRAM_BOT_TOKEN=123456789:ABCDxxxxxxxx
+TELEGRAM_WEBHOOK_SECRET=random_32_char_string</pre>
+
+<h3>Email (SMTP outbound)</h3>
+<pre>SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=nagaraai@gmail.com
+SMTP_PASSWORD=app_password_here
+SMTP_FROM=nagaraai@gmail.com</pre>
+
+<h3>Facebook &amp; Instagram</h3>
+<pre>META_APP_SECRET=your_meta_app_secret
+META_VERIFY_TOKEN=nagaraai-verify        # must match what you set in Meta dashboard
+META_PAGE_ACCESS_TOKEN=EAAxxxxxxxx       # Facebook page token
+META_IG_ACCESS_TOKEN=EAAxxxxxxxx         # Instagram business token</pre>
+
+<h3>Twitter/X</h3>
+<pre>TWITTER_API_KEY=xxxxx
+TWITTER_API_SECRET=xxxxx
+TWITTER_ACCESS_TOKEN=xxxxx
+TWITTER_ACCESS_SECRET=xxxxx
+TWITTER_BEARER_TOKEN=xxxxx</pre>
+
+<h3>App URL (for Twilio voice transcription callback)</h3>
+<pre>APP_BASE_URL=https://nagaraai.example.com</pre>
+
+
+<h2>8. Frontend Changes</h2>
+
+<h3>ReportModal.js — Channel Selector</h3>
+<p>
+  A new <strong>📡 Reporting Channel</strong> dropdown was added to the complaint submission form.
+  Options: Web (default), WhatsApp, Telegram, SMS, Email. When a non-web channel is selected,
+  a contextual hint appears explaining how to report directly via that channel instead.
+</p>
+<div class="note">The <code>channel</code> field is currently informational — it records how the citizen
+  intends to interact. For programmatic multi-channel filing, use the webhook endpoints directly.</div>
+
+<h3>ComplaintDetail.js — Send Notification Panel</h3>
+<p>
+  Officers (field_officer / ward_officer / commissioner) now see a <strong>📣 Send Notification</strong>
+  button on each complaint detail view. Clicking it expands an inline panel with:
+</p>
+<ul style="margin:8px 0 12px 20px;font-size:13px;line-height:1.8">
+  <li>Channel toggle buttons: WhatsApp, SMS, Telegram, Email</li>
+  <li>Recipient input (auto-labelled: phone/email/chat_id depending on selected channel)</li>
+  <li>Send button that calls <code>POST /api/channels/dispatch</code></li>
+  <li>Toast notification on success or failure</li>
+</ul>
+
+
+<h2>9. Tests</h2>
+<p>18 new tests added in <span class="file">backend/tests/test_channels.py</span>, running alongside the existing 57. All 75 pass in Docker.</p>
+
+<h3>Dispatcher tests (5)</h3>
+<div>
+  <span class="pill">✓ persists InboundMessage</span>
+  <span class="pill">✓ stores media attachments</span>
+  <span class="pill">✓ accepts string media_type</span>
+  <span class="pill">✓ empty text no crash</span>
+  <span class="pill">✓ ack mock called</span>
+</div>
+
+<h3>Webhook endpoint tests (8)</h3>
+<div>
+  <span class="pill">✓ voice TwiML response</span>
+  <span class="pill">✓ telegram with invalid secret</span>
+  <span class="pill">✓ facebook hub challenge</span>
+  <span class="pill">✓ facebook wrong token → 403</span>
+  <span class="pill">✓ instagram hub challenge</span>
+  <span class="pill">✓ facebook no signature (disabled)</span>
+  <span class="pill">✓ twitter empty payload</span>
+  <span class="pill">✓ email webhook ingests complaint</span>
+</div>
+
+<h3>Management endpoint tests (5)</h3>
+<div>
+  <span class="pill">✓ inbound list requires auth</span>
+  <span class="pill">✓ inbound list authenticated</span>
+  <span class="pill">✓ dispatch status 404</span>
+  <span class="pill">✓ manual dispatch complaint not found</span>
+  <span class="pill">✓ manual dispatch creates record + retrievable</span>
+</div>
+
+<pre>$ docker run --rm nagaraai-test:latest
+...
+75 passed, 68 warnings in 4.67s</pre>
+
+
+<h2>10. Deploying a New Channel</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <strong>Set the credentials</strong> — add the relevant env vars to your <code>.env</code> or Kubernetes secret.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <strong>Expose the webhook URL</strong> — in development, use <code>ngrok http 8000</code> to get a public HTTPS URL.
+    For Telegram run <code>POST /api/channels/telegram/set_webhook</code> once after deploy.
+    For Meta/Twitter, register the URL in their developer portals.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <strong>Register your webhook</strong> — point the platform's dashboard at <code>https://your-domain/api/channels/webhook/&lt;channel&gt;</code>.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-body">
+    <strong>Test end-to-end</strong> — send a test message on the channel and verify a row appears in <code>GET /api/channels/inbound</code>.
+  </div>
+</div>
+
+<div class="warn">
+  <strong>Twilio signature verification:</strong> Set <code>TWILIO_VERIFY_SIGNATURE=true</code> in production.
+  For local dev with ngrok, set it to <code>false</code> otherwise the HMAC will mismatch
+  because the URL seen by Twilio differs from what your server computes.
+</div>
+
+
+<h2>11. Quick Reference</h2>
+<table>
+  <tr><th>Channel</th><th>Library</th><th>Inbound Format</th><th>Outbound API</th></tr>
+  <tr><td>WhatsApp</td><td>twilio</td><td>Form-encoded POST</td><td>Twilio Messages API</td></tr>
+  <tr><td>SMS/MMS</td><td>twilio</td><td>Form-encoded POST</td><td>Twilio Messages API</td></tr>
+  <tr><td>Voice</td><td>twilio</td><td>TwiML + transcription POST</td><td>TwiML &lt;Say&gt; inline</td></tr>
+  <tr><td>Telegram</td><td>httpx</td><td>JSON Update object</td><td>Bot API sendMessage</td></tr>
+  <tr><td>Email</td><td>smtplib</td><td>JSON (SendGrid/Mailgun parse)</td><td>SMTP TLS</td></tr>
+  <tr><td>Facebook</td><td>httpx</td><td>Meta Graph webhook JSON</td><td>Graph API /me/messages</td></tr>
+  <tr><td>Instagram</td><td>httpx</td><td>Meta Graph webhook JSON</td><td>Graph API /me/messages</td></tr>
+  <tr><td>Twitter/X</td><td>requests-oauthlib</td><td>Account Activity JSON</td><td>DM Conversations API v2</td></tr>
+
+</table>
+
+<div class="footer">Made with IBM Bob</div>
+</body>
+</html>

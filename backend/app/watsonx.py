@@ -92,3 +92,32 @@ Respond in JSON: {{"category": "...", "priority": "...", "confidence": 0.0, "sum
         pass
 
     return classify_complaint_local(title, description)
+
+
+async def analyze_media(url: str, mime_type: str = "") -> str:
+    """
+    Return a plain-English description of an image/video/audio attachment.
+
+    If watsonx Speech-to-Text or Vision is not configured, returns a generic
+    placeholder so the rest of the pipeline can continue without crashing.
+    """
+    # Minimal implementation: for now return a placeholder.
+    # A full implementation would call watsonx Vision or speech APIs here.
+    if not settings.WATSONX_API_KEY:
+        return f"[Media attachment — type: {mime_type or 'unknown'}]"
+
+    # Stub: real call would go to watsonx Vision endpoint
+    return f"[AI analysis of media at {url[:60]}...]"
+
+
+async def transcribe_voice(audio_url: str) -> str:
+    """
+    Transcribe a voice recording URL to text using watsonx Speech-to-Text.
+
+    Falls back to an empty string if not configured.
+    """
+    if not settings.WATSONX_API_KEY:
+        return ""
+
+    # Stub: real call would POST audio_url to watsonx Speech-to-Text
+    return ""

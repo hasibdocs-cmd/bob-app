@@ -2,6 +2,8 @@
 
 Complete file-by-file description of every file and folder in the project: its purpose, what it exports, its dependencies, which other files depend on it, and how it fits into the overall application workflow.
 
+> **Last updated:** November 2026 — includes multi-channel intake (WhatsApp, SMS, Voice, Telegram, Email, Facebook, Instagram, Twitter/X), central AI dispatcher, channel management API, and 75-test suite.
+
 ---
 
 ## Table of Contents
@@ -15,7 +17,8 @@ Complete file-by-file description of every file and folder in the project: its p
    - [Data Layer](#52-data-layer)
    - [Business Logic](#53-business-logic)
    - [API Routes](#54-api-routes)
-   - [Tests](#55-tests)
+   - [Channel Adapters](#55-channel-adapters)
+   - [Tests](#56-tests)
 6. [Frontend — `frontend/`](#6-frontend--frontend)
    - [Entry Points](#61-entry-points)
    - [API Client](#62-api-client)
@@ -32,12 +35,13 @@ Complete file-by-file description of every file and folder in the project: its p
 8. [Dependency Graph](#8-dependency-graph)
 9. [Environment Variables Reference](#9-environment-variables-reference)
 10. [Database Schema](#10-database-schema)
+11. [API Endpoint Reference](#11-api-endpoint-reference)
 
 ---
 
 ## 1. Project Overview
 
-**NagaraAI** is a full-stack civic issue management platform for Bengaluru. Citizens report problems (potholes, garbage, flooding), which are automatically classified by IBM watsonx.ai (or a local rule-based fallback). Ward officers, field officers, and commissioners track, dispatch, and analyse resolution in real time through a role-adaptive single-page application.
+**NagaraAI** is a full-stack civic issue management platform for Bengaluru. Citizens report problems (potholes, garbage, flooding) through the web portal **or any of 9 external channels** (WhatsApp, SMS/MMS, Voice, Telegram, Email, Facebook, Instagram, Twitter/X). Every inbound message is automatically classified by IBM watsonx.ai Granite-13B (or a local rule-based fallback), persisted, and acknowledged. Ward officers, field officers, and commissioners track, dispatch, and analyse resolution in real time through a role-adaptive single-page application.
 
 | Layer | Technology |
 |---|---|
@@ -47,8 +51,9 @@ Complete file-by-file description of every file and folder in the project: its p
 | Database | PostgreSQL 16 (Docker) / SQLite (tests) |
 | AI | IBM watsonx.ai Granite-13B + rule-based fallback |
 | Auth | JWT (python-jose + bcrypt via passlib) |
-| Infrastructure | Docker Compose 3.9 |
-| Testing | pytest, pytest-asyncio, aiosqlite |
+| Channel integrations | Twilio (WhatsApp/SMS/MMS/Voice), Telegram Bot API, Meta Graph API, Twitter/X DM API, SMTP |
+| Infrastructure | Docker Compose, Kubernetes (kind + skaffold) |
+| Testing | pytest 8.2, pytest-asyncio, aiosqlite — **75 tests, all passing** |
 
 ---
 
@@ -56,106 +61,146 @@ Complete file-by-file description of every file and folder in the project: its p
 
 ```
 nagaraai/
-├── docker-compose.yml          # Orchestrates all 4 services (db, backend, frontend, test)
-├── README.md                   # Quick-start guide
-├── CODEBASE.md                 # ← this file
+├── docker-compose.yml              # Orchestrates all 4 services (db, backend, frontend, test)
+├── README.md                       # Quick-start guide
+├── CODEBASE.md                     # ← this file
+├── SETUP.md                        # Detailed setup + operations guide
+├── nagaraai-guide.html             # 7-tab interactive architecture guide (HTML)
+├── nagaraai-multi-channel-intake-implementation-guide.html
+│                                   # Multi-channel implementation walkthrough (HTML)
+├── nagaraai-self-hosting-guide.html
 │
 ├── backend/
-│   ├── Dockerfile              # Production backend image (uvicorn)
-│   ├── Dockerfile.test         # Test runner image (pytest, SQLite)
-│   ├── pytest.ini              # pytest config — testpaths + asyncio_mode
-│   ├── requirements.txt        # Python runtime + test dependencies
-│   ├── seed.py                 # One-time DB population script
-│   ├── .env.example            # Template for secrets
-│   ├── .env                    # Local secrets (gitignored)
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py             # FastAPI app factory + CORS
-│   │   ├── config.py           # Settings (pydantic-settings)
-│   │   ├── database.py         # SQLAlchemy engine + session
-│   │   ├── models.py           # ORM models + enums
-│   │   ├── schemas.py          # Pydantic request/response models
-│   │   ├── auth.py             # JWT + password hashing + guards
-│   │   ├── watsonx.py          # AI classifier (watsonx + local fallback)
-│   │   └── routes/
-│   │       ├── __init__.py
-│   │       ├── auth.py         # POST /api/auth/register|login, GET /me
-│   │       ├── complaints.py   # CRUD /api/complaints/
-│   │       ├── wards.py        # GET /api/wards/
-│   │       └── analytics.py    # GET /api/analytics/*
-│   └── tests/
+│   ├── Dockerfile                  # Production backend image (uvicorn)
+│   ├── Dockerfile.test             # Test runner image (pytest, SQLite)
+│   ├── pytest.ini                  # pytest config — testpaths + asyncio_mode=auto
+│   ├── requirements.txt            # Python runtime + test dependencies
+│   ├── seed.py                     # One-time DB population script
+│   ├── .env.example                # Template for secrets
+│   ├── .env                        # Local secrets (gitignored)
+│   └── app/
 │       ├── __init__.py
-│       ├── conftest.py              # pytest fixtures + test helpers
-│       ├── test_health.py           # /health + OpenAPI smoke tests
-│       ├── test_auth.py             # Register / Login / /me tests
-│       ├── test_complaints.py       # Full complaint lifecycle tests
-│       ├── test_wards_analytics.py  # Wards + analytics endpoint tests
-│       └── test_watsonx.py          # AI classifier unit tests
+│       ├── main.py                 # FastAPI app factory + CORS + router registration
+│       ├── config.py               # Settings (pydantic-settings, 40+ env vars)
+│       ├── database.py             # SQLAlchemy engine + session factory
+│       ├── models.py               # ORM models + enums (incl. channel models)
+│       ├── schemas.py              # Pydantic request/response models
+│       ├── auth.py                 # JWT + password hashing + guards
+│       ├── watsonx.py              # AI classifier + analyze_media + transcribe_voice
+│       ├── routes/
+│       │   ├── __init__.py
+│       │   ├── auth.py             # POST /api/auth/register|login, GET /me
+│       │   ├── complaints.py       # CRUD /api/complaints/
+│       │   ├── wards.py            # GET /api/wards/
+│       │   ├── analytics.py        # GET /api/analytics/*
+│       │   └── channels.py         # /api/channels/* — webhooks + dispatch mgmt
+│       └── channels/               # ← NEW: multi-channel adapter package
+│           ├── __init__.py
+│           ├── dispatcher.py       # Central AI dispatcher (all channels funnel here)
+│           ├── whatsapp.py         # Twilio WhatsApp Business API
+│           ├── sms.py              # Twilio SMS / MMS
+│           ├── voice.py            # Twilio Voice TwiML + IVR
+│           ├── telegram.py         # Telegram Bot API
+│           ├── email_chan.py        # SMTP outbound + RFC 2822 inbound parser
+│           └── social.py           # Facebook / Instagram / Twitter-X adapters
+│
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py                 # pytest fixtures + test helpers
+│   ├── test_health.py              # /health + OpenAPI smoke tests  (4 tests)
+│   ├── test_auth.py                # Register / Login / /me tests  (12 tests)
+│   ├── test_complaints.py          # Full complaint lifecycle tests (19 tests)
+│   ├── test_wards_analytics.py     # Wards + analytics endpoints    (8 tests)
+│   ├── test_watsonx.py             # AI classifier unit tests       (14 tests)
+│   └── test_channels.py            # ← NEW: channel intake tests   (18 tests)
 │
 ├── frontend/
-│   ├── Dockerfile              # Dev-server image (npm start, CRA)
-│   ├── Dockerfile.k8s          # Production multi-stage image (Node build → Nginx)
-│   ├── package.json            # npm dependencies + scripts
+│   ├── Dockerfile                  # Dev-server image (npm start, CRA)
+│   ├── Dockerfile.k8s              # Production multi-stage image (Node build → Nginx)
+│   ├── package.json                # npm dependencies + scripts
 │   └── src/
-│       ├── index.js            # React DOM entry point
-│       ├── index.css           # Global CSS variables + base styles
-│       ├── App.js              # Router root + auth-gated routes
-│       ├── api.js              # Axios instance + interceptors
+│       ├── index.js                # React DOM entry point
+│       ├── index.css               # Global CSS variables + base styles
+│       ├── App.js                  # Router root + auth-gated routes
+│       ├── api.js                  # Axios instance + interceptors
+│       ├── setupProxy.js           # CRA dev-proxy → backend:8000 (Docker safe)
 │       ├── context/
-│       │   └── AuthContext.js  # Auth state (user, login, logout)
+│       │   └── AuthContext.js      # Auth state (user, login, logout)
 │       ├── pages/
-│       │   ├── Login.js        # Login form page
-│       │   ├── Register.js     # Registration form page
-│       │   ├── Dashboard.js    # City analytics + charts
-│       │   ├── Complaints.js   # Issue list + filters + actions
-│       │   └── WardMap.js      # Leaflet choropleth risk map
+│       │   ├── Login.js            # Login form page
+│       │   ├── Register.js         # Registration form page
+│       │   ├── Dashboard.js        # City analytics + charts
+│       │   ├── Complaints.js       # Issue list + filters + actions
+│       │   └── WardMap.js          # Leaflet choropleth risk map
 │       └── components/
 │           ├── AppShell.js         # Authenticated layout wrapper + sub-router
 │           ├── Sidebar.js          # Role-adaptive nav + user chip
-│           ├── ReportModal.js      # Citizen complaint submission form
-│           └── ComplaintDetail.js  # Complaint detail panel + status updates
+│           ├── ReportModal.js      # Citizen complaint form + channel selector
+│           └── ComplaintDetail.js  # Complaint detail + status updates + notify panel
 │
-└── k8s/                        # Kubernetes manifests (minikube / kind / skaffold)
-    ├── namespace.yaml           # nagaraai namespace definition
-    ├── kind-config.yaml         # kind cluster with ingress port mappings
-    ├── skaffold.yaml            # Skaffold dev-loop config
-    ├── README.md                # Kubernetes deployment guide
-    ├── secrets/
-    │   └── secrets.yaml         # Base64-encoded DB creds + JWT secret
-    ├── postgres/
-    │   ├── pvc.yaml             # 1 Gi PersistentVolumeClaim
-    │   ├── deployment.yaml      # postgres:16-alpine pod + readiness probe
-    │   └── service.yaml         # ClusterIP postgres-svc:5432
-    ├── backend/
-    │   ├── deployment.yaml      # FastAPI pod + initContainer + health probes
-    │   └── service.yaml         # ClusterIP backend-svc:8000
-    ├── frontend/
-    │   ├── deployment.yaml      # Nginx pod + ConfigMap nginx proxy config
-    │   └── service.yaml         # NodePort frontend-svc:3000 → host:30080
-    └── ingress/
-        └── ingress.yaml         # nginx-ingress: /api → backend, / → frontend
+└── k8s/                            # Kubernetes manifests
+    ├── namespace.yaml
+    ├── kind-config.yaml
+    ├── skaffold.yaml
+    ├── README.md
+    ├── secrets/secrets.yaml
+    ├── postgres/  (pvc + deployment + service)
+    ├── backend/   (deployment + service)
+    ├── frontend/  (deployment + service)
+    └── ingress/ingress.yaml
 ```
 
 ---
 
 ## 3. Application Workflow
 
-### Request lifecycle — filing a complaint
+### 3.1 Web complaint lifecycle
 
 ```
 Browser (Citizen)
   └─→ ReportModal.js          POST /api/complaints/
         └─→ api.js            attaches Bearer token
-              └─→ FastAPI backend
+              └─→ routes/complaints.py
                     ├─→ auth.py::get_current_user()   validates JWT
                     ├─→ watsonx.py::classify_with_watsonx()
-                    │         ├─ if WATSONX_API_KEY set → IBM Granite-13B
+                    │         ├─ WATSONX_API_KEY set → IBM Granite-13B
                     │         └─ else → classify_complaint_local()
                     ├─→ models.Complaint  (created in DB)
                     └─→ schemas.ComplaintOut  (returned to browser)
 ```
 
-### Auth lifecycle
+### 3.2 Multi-channel inbound lifecycle (NEW)
+
+```
+Citizen (any channel: WhatsApp / SMS / Telegram / Voice / Email / FB / IG / Twitter)
+  └─→ Platform webhook POST → routes/channels.py::webhook_<channel>()
+        ├─→ Signature verification (Twilio HMAC / Meta SHA256 / Telegram secret)
+        └─→ channels/dispatcher.py::dispatch_inbound()
+              ├─→ watsonx.py::classify_with_watsonx()   (AI classification)
+              ├─→ DB: InboundMessage row  (+ MediaAttachment rows if media present)
+              └─→ _send_ack()  → reply on the same channel
+                        ├─ ChannelType.whatsapp  → channels/whatsapp.py::send_whatsapp()
+                        ├─ ChannelType.sms/mms   → channels/sms.py::send_sms()
+                        ├─ ChannelType.telegram  → channels/telegram.py::send_telegram()
+                        ├─ ChannelType.email     → channels/email_chan.py::send_email()
+                        ├─ ChannelType.facebook  → channels/social.py::send_facebook_message()
+                        ├─ ChannelType.instagram → channels/social.py::send_instagram_message()
+                        └─ ChannelType.twitter_x → channels/social.py::send_twitter_dm()
+```
+
+### 3.3 Officer outbound notification lifecycle (NEW)
+
+```
+Officer (ComplaintDetail.js → Send Notification panel)
+  └─→ POST /api/channels/dispatch  { complaint_id, channel, recipient }
+        └─→ routes/channels.py::manual_dispatch()
+              ├─→ DB: Complaint lookup (404 if not found)
+              ├─→ Auto-generate message body from complaint if not supplied
+              ├─→ Call channel adapter outbound sender
+              └─→ DB: ChannelDispatch row (status: sent | queued)
+```
+
+### 3.4 Auth lifecycle
 
 ```
 Login.js  POST /api/auth/login
@@ -167,44 +212,49 @@ Login.js  POST /api/auth/login
                                 └─→ api.js interceptor auto-injects header
 ```
 
-### Role-based view scoping
+### 3.5 Role-based view scoping
 
-| Role | Complaint list scope | Sidebar label |
-|---|---|---|
-| `citizen` | Only their own reports | "My Reports" |
-| `field_officer` | Only assigned to them | "My Tasks" |
-| `ward_officer` | All in their ward | "Ward Issues" |
-| `commissioner` | All city-wide | "All Issues" |
+| Role | Complaint list scope | Can update status | Send notifications |
+|---|---|---|---|
+| `citizen` | Only their own reports | No | No |
+| `field_officer` | Assigned to them | Yes | Yes |
+| `ward_officer` | All in their ward | Yes | Yes |
+| `commissioner` | All city-wide | Yes | Yes |
 
 ---
 
 ## 4. Root Files
 
----
-
 ### `docker-compose.yml`
 
-**Purpose:** Defines and connects all four services (db, backend, frontend, test).
+**Purpose:** Defines and connects all four services.
 **Used by:** `docker compose up`, CI pipelines.
 
 | Service | Image / Build | Ports | Key env vars | Depends on |
 |---|---|---|---|---|
-| `db` | `postgres:16-alpine` | 5432 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | — |
-| `backend` | `./backend/Dockerfile` | 8000 | `DATABASE_URL`, `SECRET_KEY`, `WATSONX_API_KEY`, `WATSONX_PROJECT_ID` | `db` (healthy) |
-| `frontend` | `./frontend/Dockerfile` | 3000 | `REACT_APP_API_URL` | `backend` |
-| `test` | `./backend/Dockerfile.test` | — | `DATABASE_URL=sqlite:///./test.db`, `SECRET_KEY=test-secret-key` | — (profile: `test`) |
+| `db` | `postgres:16-alpine` | 5432 | `POSTGRES_*` | — |
+| `backend` | `./backend/Dockerfile` | 8000 | `DATABASE_URL`, `SECRET_KEY`, `WATSONX_*`, all channel vars | `db` (healthy) |
+| `frontend` | `./frontend/Dockerfile` | 3000 | `REACT_APP_PROXY_TARGET` | `backend` |
+| `test` | `./backend/Dockerfile.test` | — | `DATABASE_URL=sqlite:///./test.db` | — (profile: `test`) |
 
-The `test` service uses Docker profile `test` — only started with:
+The `test` service uses Docker profile `test`:
 ```bash
 docker compose --profile test up test
+# or directly:
+docker run --rm nagaraai-test:latest
 ```
-The `db` service uses a named volume `pgdata` for data persistence across container restarts.
-
----
 
 ### `README.md`
+Quick-start guide, demo logins, API reference table, tech-stack summary.
 
-**Purpose:** Quick-start guide, project structure overview, demo logins, API reference table, tech-stack summary. The human-readable entry point for new developers.
+### `SETUP.md`
+Detailed setup + operations guide covering Docker Compose, manual install, Kubernetes, secrets configuration, channel webhook registration, and troubleshooting.
+
+### `nagaraai-guide.html`
+7-tab interactive HTML architecture guide (Architecture, Lifecycle, Escalation Matrix, Role Permissions, SLA & Categories, API Reference, User Guide).
+
+### `nagaraai-multi-channel-intake-implementation-guide.html`
+Walkthrough of the multi-channel implementation: schema, dispatcher internals, channel adapters, all API endpoints, env vars, frontend changes, test coverage.
 
 ---
 
@@ -214,476 +264,276 @@ The `db` service uses a named volume `pgdata` for data persistence across contai
 
 ### 5.1 Configuration & Bootstrap
 
----
-
 #### `backend/Dockerfile`
-
-**Purpose:** Builds the production Python image for the backend service.
-**Base image:** `python:3.12-slim`
-**Steps:**
-1. Sets `WORKDIR /app`
-2. Copies and installs `requirements.txt` (layer-cached)
-3. Copies source code
-4. Exposes port `8000`
-5. Default `CMD`: `uvicorn app.main:app --host 0.0.0.0 --port 8000`
-
-> In `docker-compose.yml` the CMD is **overridden** to add `--reload` for hot-reloading during development.
-
-**Depends on:** `requirements.txt`, `app/`
-**Used by:** `docker-compose.yml` → `backend` service, `k8s/backend/deployment.yaml`
-
----
+Multi-stage production image. Installs Python 3.12-slim, copies `requirements.txt`, runs `pip install`, copies application code, starts `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
 
 #### `backend/Dockerfile.test`
-
-**Purpose:** Dedicated image for running the pytest test suite inside Docker. Bakes in SQLite environment variables so no external database is needed.
-**Base image:** `python:3.12-slim`
-**Key differences from `Dockerfile`:**
-- Sets `ENV DATABASE_URL=sqlite:///./test.db` and `ENV SECRET_KEY=test-secret-key` at build time
-- `CMD ["pytest", "-v", "--tb=short"]` — runs tests immediately on container start
-
-**Run the test suite:**
-```bash
-# Using the docker-compose test service (profile)
-docker compose --profile test run --rm test
-
-# Or build and run standalone
-docker build -f backend/Dockerfile.test -t nagaraai-test ./backend
-docker run --rm nagaraai-test
-```
-
-**Depends on:** `requirements.txt`, `app/`, `tests/`
-**Used by:** `docker-compose.yml` → `test` service
-
----
+Identical base, but runs `pytest -v --tb=short` as `CMD`. Sets `DATABASE_URL=sqlite:///./test.db` so no Postgres is needed. Used by `docker run --rm nagaraai-test:latest`.
 
 #### `backend/pytest.ini`
-
-**Purpose:** Configures pytest for the project. Two settings:
-
 ```ini
 [pytest]
-testpaths = tests        # only look in the tests/ directory
-asyncio_mode = auto      # treat all async test functions as asyncio without @pytest.mark.asyncio
+testpaths = tests
+asyncio_mode = auto
 ```
-
-The `asyncio_mode = auto` is required by `pytest-asyncio 0.23+` to auto-collect async tests in `test_watsonx.py`.
-
-**Used by:** `pytest` CLI, `Dockerfile.test`
-
----
+Sets `asyncio_mode=auto` so all `async def test_*` functions run without explicit `@pytest.mark.asyncio` markers (though the existing tests also use them for clarity).
 
 #### `backend/requirements.txt`
+Key dependencies:
 
-**Purpose:** Pins all Python runtime and test dependencies.
-
-| Package | Version | Role |
+| Package | Version | Purpose |
 |---|---|---|
 | `fastapi` | 0.111.0 | Web framework |
 | `uvicorn[standard]` | 0.29.0 | ASGI server |
-| `sqlalchemy` | 2.0.30 | ORM + query builder |
-| `alembic` | 1.13.1 | Database migrations |
-| `psycopg2-binary` | 2.9.9 | PostgreSQL driver |
-| `pydantic` | 2.7.1 | Data validation / serialisation |
-| `pydantic-settings` | 2.2.1 | Settings from `.env` |
-| `python-jose[cryptography]` | 3.3.0 | JWT encode/decode |
+| `sqlalchemy` | 2.0.30 | ORM |
+| `alembic` | 1.13.1 | Migrations |
+| `pydantic` | 2.7.1 | Data validation |
+| `pydantic-settings` | 2.2.1 | Settings from env |
+| `python-jose[cryptography]` | 3.3.0 | JWT |
 | `passlib[bcrypt]` | 1.7.4 | Password hashing |
-| `python-multipart` | 0.0.9 | Form data parsing (FastAPI) |
-| `httpx` | 0.27.0 | Async HTTP client for watsonx |
-| `python-dotenv` | 1.0.1 | `.env` file loading |
+| `bcrypt` | 4.0.1 | Pinned — passlib incompatible with 4.1+ |
+| `httpx` | 0.27.0 | Async HTTP (watsonx + social APIs) |
+| `twilio` | 9.0.4 | WhatsApp / SMS / Voice |
+| `requests-oauthlib` | 1.3.1 | Twitter/X OAuth1 |
 | `pytest` | 8.2.2 | Test runner |
 | `pytest-asyncio` | 0.23.7 | Async test support |
-| `aiosqlite` | 0.20.0 | Async SQLite driver for tests |
-
-**Used by:** `Dockerfile` (COPY + pip install), all Python source files.
-
----
-
-#### `backend/.env.example`
-
-**Purpose:** Documents all required environment variables with safe placeholder values. Committed to version control. Never contains real secrets.
-
-**Copy to `.env` before running:** `cp backend/.env.example backend/.env`
-
-**Variables defined:**
-
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | SQLAlchemy connection string |
-| `SECRET_KEY` | JWT signing secret — **must be changed in production** |
-| `ALGORITHM` | JWT algorithm (default: `HS256`) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token TTL (default: `1440` = 24 h) |
-| `WATSONX_API_KEY` | IBM Cloud API key — leave blank to use local classifier |
-| `WATSONX_PROJECT_ID` | watsonx project ID |
-| `WATSONX_URL` | watsonx endpoint (default: `us-south`) |
-
-**Depended on by:** `app/config.py`
-
----
+| `aiosqlite` | 0.20.0 | SQLite async driver for tests |
 
 #### `backend/app/config.py`
+**Exports:** `settings` (singleton `Settings` instance).
+**Pattern:** `pydantic_settings.BaseSettings` with `model_config = SettingsConfigDict(env_file=".env", extra="ignore")`. Settings are read from environment variables first, then `.env` file, then defaults.
 
-**Purpose:** Single source of truth for all runtime configuration. Reads from environment variables (and `.env` file via `python-dotenv`).  
-**Exports:** `settings` — a singleton `Settings` instance available app-wide.
-
-```python
-settings.DATABASE_URL           # str
-settings.SECRET_KEY             # str
-settings.ALGORITHM              # str  (default: "HS256")
-settings.ACCESS_TOKEN_EXPIRE_MINUTES  # int (default: 1440)
-settings.WATSONX_API_KEY        # str  (empty = fallback mode)
-settings.WATSONX_PROJECT_ID     # str
-settings.WATSONX_URL            # str
-```
-
-**Dependencies:** `pydantic-settings`  
-**Used by:** `app/database.py`, `app/auth.py`, `app/watsonx.py`
-
----
+Groups:
+- **Core:** `DATABASE_URL`, `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`
+- **watsonx.ai:** `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, `WATSONX_URL`
+- **Twilio:** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, `TWILIO_WHATSAPP_NUMBER`, `TWILIO_VERIFY_SIGNATURE`
+- **Telegram:** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`
+- **SMTP:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+- **Meta:** `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_PAGE_ACCESS_TOKEN`, `META_IG_ACCESS_TOKEN`
+- **Twitter/X:** `TWITTER_BEARER_TOKEN`, `TWITTER_API_KEY`, `TWITTER_API_SECRET`, `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_SECRET`
+- **App:** `APP_BASE_URL` (used for Twilio voice transcription callback URL)
 
 #### `backend/app/database.py`
-
-**Purpose:** Creates the SQLAlchemy engine and session factory. Provides the `get_db()` dependency injected into every route that needs a database session.  
-**Exports:**
-- `engine` — SQLAlchemy `Engine` (used by `Base.metadata.create_all`)
-- `SessionLocal` — `sessionmaker` factory
-- `Base` — `declarative_base()` that all ORM models inherit from
-- `get_db()` — FastAPI dependency; yields a DB session and closes it after the request
-
-**Dependencies:** `app/config.py` (for `DATABASE_URL`)  
-**Used by:** `app/main.py`, `app/models.py`, `app/auth.py`, all route files, `seed.py`, `tests/conftest.py`
-
----
+**Exports:** `Base`, `engine`, `SessionLocal`, `get_db` (FastAPI dependency).
+Creates the SQLAlchemy engine from `settings.DATABASE_URL`. `get_db()` is a generator that yields a session and closes it after the request.
 
 #### `backend/app/main.py`
+**Exports:** `app` (FastAPI instance).
+Creates the app, adds CORS middleware (allow all origins — tighten in production), creates all DB tables (`Base.metadata.create_all`), and registers all routers:
 
-**Purpose:** FastAPI application factory. Creates the `app` object, registers CORS middleware, mounts all routers, and auto-creates database tables on startup.  
-**Exports:** `app` — the FastAPI application (referenced by uvicorn as `app.main:app`)
-
-**What it does on import:**
-1. `Base.metadata.create_all(bind=engine)` — creates all ORM tables if they don't exist
-2. Adds `CORSMiddleware` with `allow_origins=["*"]` (suitable for development)
-3. Registers four routers: `auth`, `complaints`, `wards`, `analytics`
-4. Registers `GET /health` — returns `{"status": "ok", "service": "NagaraAI"}`
-
-**Dependencies:** `app/database.py`, `app/routes/auth.py`, `app/routes/complaints.py`, `app/routes/wards.py`, `app/routes/analytics.py`  
-**Used by:** `uvicorn` process, `tests/conftest.py` (via `TestClient`)
+```python
+app.include_router(auth.router)
+app.include_router(complaints.router)
+app.include_router(wards.router)
+app.include_router(analytics.router)
+app.include_router(channels_router.router)   # ← NEW
+```
 
 ---
 
 ### 5.2 Data Layer
 
----
-
 #### `backend/app/models.py`
-
-**Purpose:** Defines the full PostgreSQL schema as SQLAlchemy ORM classes. This is the single source of truth for the database structure.
+**Exports:** All ORM models + enums.
 
 **Enums:**
-
 | Enum | Values |
 |---|---|
-| `UserRole` | `citizen`, `field_officer`, `ward_officer`, `commissioner` |
-| `IssueCategory` | `garbage_black_spot`, `cd_waste`, `waterlogging`, `drain_blockage`, `groundwater`, `other` |
-| `IssuePriority` | `low`, `medium`, `high`, `critical` |
-| `IssueStatus` | `open`, `assigned`, `in_progress`, `resolved`, `closed`, `escalated` |
+| `UserRole` | citizen, field_officer, ward_officer, commissioner |
+| `IssueCategory` | garbage_black_spot, cd_waste, waterlogging, drain_blockage, groundwater, other |
+| `IssuePriority` | low, medium, high, critical |
+| `IssueStatus` | open, assigned, in_progress, resolved, closed, escalated |
+| `ChannelType` *(new)* | whatsapp, telegram, sms, mms, email, voice, twitter_x, facebook, instagram, web, api |
+| `MediaType` *(new)* | image, video, audio, document, location |
 
-**Tables / ORM classes:**
+**ORM Models:**
 
-| Class | Table | Key columns | Relationships |
-|---|---|---|---|
-| `User` | `users` | `id`, `name`, `email`, `hashed_password`, `role`, `ward_id`, `is_active` | `ward` (Ward), `complaints` (reporter), `assigned_complaints` (assignee) |
-| `Ward` | `wards` | `id`, `name`, `zone`, `population`, `flood_risk_score`, `cleanliness_score` | `users`, `complaints`, `contractors` |
-| `Contractor` | `contractors` | `id`, `name`, `ward_id`, `compliance_score`, `total_assigned`, `total_resolved` | `ward`, `complaints` |
-| `Complaint` | `complaints` | `id`, `ticket_id`, `title`, `category`, `priority`, `status`, `latitude`, `longitude`, `ai_classification`, `ai_confidence`, `ai_summary`, `reporter_id`, `assignee_id`, `ward_id`, `contractor_id`, `sla_deadline`, `resolved_at`, `citizen_rating` | `reporter`, `assignee`, `ward`, `contractor`, `updates` |
-| `ComplaintUpdate` | `complaint_updates` | `id`, `complaint_id`, `updated_by`, `status`, `note` | `complaint` |
-
-**Dependencies:** `app/database.py` (for `Base`)  
-**Used by:** `app/schemas.py`, `app/auth.py`, all route files, `seed.py`, `tests/`
-
----
+| Model | Table | Key relationships |
+|---|---|---|
+| `User` | `users` | → `Ward`, → `Complaint` (reporter + assignee) |
+| `Ward` | `wards` | ← `User`, ← `Complaint`, ← `Contractor` |
+| `Contractor` | `contractors` | → `Ward`, ← `Complaint` |
+| `Complaint` | `complaints` | → `User` (×2), → `Ward`, → `Contractor`, ← `ComplaintUpdate`, ← `InboundMessage`, ← `ChannelDispatch` |
+| `ComplaintUpdate` | `complaint_updates` | → `Complaint`, → `User` |
+| `InboundMessage` *(new)* | `inbound_messages` | → `Complaint` (nullable), ← `MediaAttachment` |
+| `MediaAttachment` *(new)* | `media_attachments` | → `InboundMessage` |
+| `ChannelDispatch` *(new)* | `channel_dispatches` | → `Complaint` |
 
 #### `backend/app/schemas.py`
+**Exports:** Pydantic models for request validation and response serialization.
 
-**Purpose:** Pydantic models for request validation and response serialisation. Keeps ORM models separate from the API contract.
+Core schemas: `UserCreate`, `UserLogin`, `UserOut`, `Token`, `WardOut`, `ContractorOut`, `ComplaintCreate`, `ComplaintUpdate`, `ComplaintRating`, `ComplaintOut`, `ComplaintUpdateOut`, `CityStats`, `WardStats`.
 
-**Schema groups:**
-
-| Schema | Direction | Used by |
-|---|---|---|
-| `UserCreate` | request (register) | `routes/auth.py` |
-| `UserLogin` | request (login) | `routes/auth.py` |
-| `UserOut` | response | `routes/auth.py`, `Token` |
-| `Token` | response (login) | `routes/auth.py` |
-| `WardOut` | response | `routes/wards.py` |
-| `ContractorOut` | response | (analytics, internal) |
-| `ComplaintCreate` | request (create complaint) | `routes/complaints.py` |
-| `ComplaintUpdate` | request (patch complaint) | `routes/complaints.py` |
-| `ComplaintRating` | request (rate complaint) | `routes/complaints.py` |
-| `ComplaintUpdateOut` | response (embedded in `ComplaintOut`) | `routes/complaints.py` |
-| `ComplaintOut` | response | `routes/complaints.py` |
-| `CityStats` | response | `routes/analytics.py` |
-| `WardStats` | response | `routes/wards.py` |
-
-**Dependencies:** `app/models.py` (imports enums), `pydantic`  
-**Used by:** all route files
-
----
+Channel schemas *(new)*:
+- `MediaAttachmentOut` — response model for `MediaAttachment`
+- `InboundMessageOut` — response model for `InboundMessage` with nested `attachments`
+- `ChannelDispatchOut` — response model for `ChannelDispatch`
+- `DispatchRequest` — body for `POST /api/channels/dispatch`
+- `TwilioWebhookPayload` — Twilio form-encoded webhook fields
+- `TelegramUpdate` — Telegram Update JSON object
+- `MetaWebhookPayload` — Meta (Facebook/Instagram) webhook entry array
 
 #### `backend/seed.py`
-
-**Purpose:** One-time database population script. Creates demo wards, contractors, and four role-based users. Safe to re-run (idempotent — checks for existing records before inserting).
-
-**What it inserts:**
-
-| Type | Count | Details |
-|---|---|---|
-| Wards | 8 | Jayanagar, Malleswaram, Whitefield, Koramangala, Hebbal, BTM Layout, Yelahanka, Marathahalli — with realistic flood/cleanliness scores |
-| Contractors | 5 | CleanBengaluru Pvt Ltd, SwachhCity Services, GreenWaste Solutions, BBMP Direct Team A, EcoManage Corp |
-| Users | 4 | citizen@demo.com, field@demo.com, ward@demo.com, commissioner@demo.com — all password `demo1234` |
-
-**Run command:**
+Standalone script. Creates all tables, inserts 4 wards, 4 demo users (citizen / field_officer / ward_officer / commissioner), 2 contractors, and 6 sample complaints. Run once after first `docker compose up`:
 ```bash
-# Docker
 docker compose exec backend python seed.py
-
-# Manual
-python seed.py   # from backend/ with venv active
 ```
-
-**Dependencies:** `app/database.py`, `app/models.py`, `app/auth.py` (for `hash_password`)  
-**Used by:** developer/CI setup only — not imported by any application code
 
 ---
 
 ### 5.3 Business Logic
 
----
-
 #### `backend/app/auth.py`
+**Exports:** `hash_password`, `verify_password`, `create_access_token`, `get_current_user`, `require_role`, `oauth2_scheme`.
 
-**Purpose:** All authentication and authorisation logic. Provides reusable FastAPI dependencies for route protection.
-
-**Exports:**
-
-| Symbol | Type | Purpose |
-|---|---|---|
-| `hash_password(password)` | function | bcrypt-hashes a plain-text password |
-| `verify_password(plain, hashed)` | function | verifies a plain password against a bcrypt hash |
-| `create_access_token(data, expires_delta)` | function | creates a signed JWT with `sub` (user id) and `role` claims |
-| `get_current_user(token, db)` | FastAPI dependency | decodes JWT, looks up user in DB, raises 401 if invalid |
-| `require_role(*roles)` | dependency factory | returns a dependency that raises 403 if user's role is not in `roles` |
-| `pwd_context` | CryptContext | passlib bcrypt context |
-| `oauth2_scheme` | OAuth2PasswordBearer | extracts `Authorization: Bearer <token>` header |
-
-**Dependencies:** `app/config.py` (SECRET_KEY, ALGORITHM), `app/models.py`, `app/database.py`, `python-jose`, `passlib`  
-**Used by:** `routes/auth.py`, `routes/complaints.py`, `routes/analytics.py`, `seed.py`
-
----
+- `get_current_user` — FastAPI dependency; decodes JWT, queries User by `sub` claim, raises 401 if invalid.
+- `require_role(*roles)` — higher-order dependency factory for role-based access.
 
 #### `backend/app/watsonx.py`
+**Exports:** `classify_complaint_local`, `classify_with_watsonx`, `analyze_media`, `transcribe_voice`, `SLA_HOURS`.
 
-**Purpose:** AI classification engine. Routes complaint text through IBM watsonx.ai (Granite-13B) when credentials are present, otherwise uses a deterministic rule-based fallback. This is the only file that makes external HTTP calls.
-
-**Exports:**
-
-| Symbol | Type | Purpose |
-|---|---|---|
-| `CATEGORY_KEYWORDS` | dict | keyword → category mapping used by local classifier |
-| `SLA_HOURS` | dict | priority → SLA deadline in hours (`critical=4`, `high=24`, `medium=72`, `low=168`) |
-| `classify_complaint_local(title, description)` | function | synchronous rule-based classifier; always returns a valid result dict |
-| `classify_with_watsonx(title, description)` | async function | tries watsonx first; falls back to local on any error or missing credentials |
-
-**Return dict shape:**
-```python
-{
-  "category": str,     # one of IssueCategory values
-  "priority": str,     # one of IssuePriority values
-  "confidence": float, # 0.0–1.0
-  "summary": str,      # one-sentence description
-}
-```
-
-**watsonx flow:**
-1. POST to `https://iam.cloud.ibm.com/identity/token` to exchange API key for IAM token
-2. POST to `{WATSONX_URL}/ml/v1/text/generation` with `ibm/granite-13b-instruct-v2`
-3. Parse JSON from generated text with regex
-4. On any exception → silently fall back to local classifier
-
-**Dependencies:** `app/config.py`, `httpx`  
-**Used by:** `routes/complaints.py`  
-**Tested by:** `tests/test_watsonx.py`
+| Function | Purpose |
+|---|---|
+| `classify_complaint_local(title, desc)` | Keyword-based rule classifier — always available, no credentials needed |
+| `classify_with_watsonx(title, desc)` | Async — calls IBM Granite-13B via IAM token; falls back to local on any error |
+| `analyze_media(url, mime_type)` | Stub for watsonx Vision — returns placeholder if no key |
+| `transcribe_voice(audio_url)` | Stub for watsonx Speech-to-Text — returns `""` if no key |
+| `SLA_HOURS` | Dict: `{critical: 4, high: 24, medium: 72, low: 168}` |
 
 ---
 
 ### 5.4 API Routes
 
-All routers are mounted in `app/main.py`. Every endpoint (except `/health` and `/api/wards/`) requires a valid JWT.
-
----
-
 #### `backend/app/routes/auth.py`
-
-**Prefix:** `/api/auth`  
-**Purpose:** User registration, login, and profile retrieval.
-
-| Method | Path | Auth | Request | Response | Description |
-|---|---|---|---|---|---|
-| `POST` | `/register` | None | `UserCreate` | `UserOut` (201) | Creates a new user; rejects duplicate emails |
-| `POST` | `/login` | None | `UserLogin` | `Token` | Validates credentials; returns JWT + user object |
-| `GET` | `/me` | Required | — | `UserOut` | Returns the currently authenticated user |
-
-**Dependencies:** `app/database.py`, `app/models.py`, `app/schemas.py`, `app/auth.py`
-
----
+Prefix: none. Endpoints:
+- `POST /api/auth/register` — creates User, returns `Token`
+- `POST /api/auth/login` — verifies credentials, returns `Token`
+- `GET /api/auth/me` — returns `UserOut` for current JWT holder
 
 #### `backend/app/routes/complaints.py`
-
-**Prefix:** `/api/complaints`  
-**Purpose:** Full complaint lifecycle — creation with AI triage, role-scoped listing, status updates, and citizen ratings.
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/` | Required | Creates complaint; calls `classify_with_watsonx`, auto-assigns SLA, auto-assigns best contractor |
-| `GET` | `/` | Required | Lists complaints scoped by role (citizen=own, field=assigned, ward=ward, commissioner=all); supports `?status=`, `?category=`, `?ward_id=`, `?limit=`, `?offset=` |
-| `GET` | `/{id}` | Required | Gets a single complaint by ID |
-| `PATCH` | `/{id}` | Required | Updates status/priority/assignee/contractor; logs `ComplaintUpdate` on status change; recalculates contractor compliance on `resolved` |
-| `POST` | `/{id}/rate` | Required | Citizen submits 1–5 star rating |
-
-**Side effects on status change to `resolved`:**
-- Sets `complaint.resolved_at`
-- Increments `contractor.total_resolved`
-- Recalculates `contractor.compliance_score = (total_resolved / total_assigned) * 100`
-
-**Dependencies:** `app/database.py`, `app/models.py`, `app/schemas.py`, `app/auth.py`, `app/watsonx.py`
-
----
+Prefix: `/api/complaints`. Endpoints:
+- `POST /` — creates Complaint, runs AI classification, sets SLA deadline
+- `GET /` — lists complaints scoped to role (citizen → own, field_officer → assigned, ward_officer → ward, commissioner → all)
+- `GET /{id}` — single complaint with updates
+- `PATCH /{id}` — update status / priority / assignee / contractor; creates `ComplaintUpdate` row
+- `POST /{id}/rate` — citizen submits rating 1–5
 
 #### `backend/app/routes/wards.py`
-
-**Prefix:** `/api/wards`  
-**Purpose:** Provides ward data for dropdowns and map rendering. No authentication required (public data).
-
-| Method | Path | Auth | Response | Description |
-|---|---|---|---|---|
-| `GET` | `/` | None | `list[WardOut]` | All wards with risk scores |
-| `GET` | `/{ward_id}/stats` | None | `WardStats` | Open/resolved counts + risk scores for a ward |
-
-**Dependencies:** `app/database.py`, `app/models.py`, `app/schemas.py`
-
----
+Prefix: `/api/wards`. Endpoints:
+- `GET /` — lists all wards
+- `GET /{id}/stats` — open + resolved counts + scores for one ward
 
 #### `backend/app/routes/analytics.py`
+Prefix: `/api/analytics`. Endpoints (all require auth):
+- `GET /city` — `CityStats` aggregate
+- `GET /ward-heatmap` — list of `WardStats`
+- `GET /contractors` — contractor leaderboard sorted by compliance
 
-**Prefix:** `/api/analytics`  
-**Purpose:** Aggregated city-level metrics for the Dashboard and commissioner view. All endpoints require authentication.
+#### `backend/app/routes/channels.py` *(NEW)*
+Prefix: `/api/channels`. Two groups:
 
-| Method | Path | Response | Description |
+**Webhook endpoints (no auth — platform-verified):**
+
+| Method | Path | Channel | Verification |
 |---|---|---|---|
-| `GET` | `/city` | `CityStats` | Total complaints, open count, resolved today, avg resolution hours, top category, high-risk wards (flood_risk ≥ 7.0) |
-| `GET` | `/ward-heatmap` | `list[dict]` | Per-ward open complaints + flood/cleanliness scores for the bar chart |
-| `GET` | `/contractors` | `list[dict]` | Contractor leaderboard sorted by `compliance_score` descending, includes computed `resolution_rate` |
+| POST | `/webhook/whatsapp` | Twilio WhatsApp | HMAC `X-Twilio-Signature` |
+| POST | `/webhook/sms` | Twilio SMS/MMS | HMAC `X-Twilio-Signature` |
+| POST | `/webhook/voice` | Twilio Voice | Returns TwiML only |
+| POST | `/webhook/voice/transcription` | Twilio transcription cb | None (internal) |
+| POST | `/webhook/telegram` | Telegram Bot | `X-Telegram-Bot-Api-Secret-Token` |
+| GET/POST | `/webhook/facebook` | Meta Messenger | Hub challenge / `X-Hub-Signature-256` |
+| GET/POST | `/webhook/instagram` | Meta Instagram DM | Hub challenge / `X-Hub-Signature-256` |
+| POST | `/webhook/twitter` | Twitter/X Account Activity | None (bearer token) |
+| POST | `/webhook/email` | Email (via MTA parse) | None |
 
-**Dependencies:** `app/database.py`, `app/models.py`, `app/schemas.py`, `app/auth.py`
+**Management endpoints (JWT Bearer required):**
 
----
-
-#### `backend/app/routes/__init__.py`
-
-**Purpose:** Empty package marker. Makes `app/routes/` a Python package so relative imports work.
-
----
-
-#### `backend/app/__init__.py`
-
-**Purpose:** Empty package marker. Makes `app/` a Python package.
-
----
-
-### 5.5 Tests
-
-The test suite uses **SQLite in-memory** (via `aiosqlite`) instead of PostgreSQL, so no database server is needed to run tests.
-
----
-
-#### `backend/tests/conftest.py`
-
-**Purpose:** Shared pytest fixtures and helper functions. The authoritative test infrastructure file.
-
-**What it sets up:**
-- Patches `DATABASE_URL` to `sqlite:///./test.db` before anything else imports `app.database`
-- Creates a `TestingSessionLocal` and overrides `get_db` via `app.dependency_overrides`
-- Creates all tables once per session (`create_tables` fixture, `scope="session"`, `autouse=True`)
-- Drops all tables and deletes `test.db` after the session ends
-
-**Fixtures:**
-
-| Fixture | Scope | Purpose |
+| Method | Path | Purpose |
 |---|---|---|
-| `create_tables` | session, autouse | Creates + tears down all SQLite tables |
-| `db` | function | Provides a raw DB session |
-| `client` | session | FastAPI `TestClient` with overridden DB |
-
-**Helper functions (importable by test modules):**
-
-| Function | Purpose |
-|---|---|
-| `register_user(client, email, password, name, role)` | POST /api/auth/register |
-| `login_user(client, email, password)` | POST /api/auth/login |
-| `auth_headers(client, email, password)` | Returns `{"Authorization": "Bearer <token>"}` |
-
-**Dependencies:** `app/database.py`, `app/main.py`, `pytest`, `sqlalchemy`, `fastapi.testclient`  
-**Used by:** all test files
+| `POST` | `/dispatch` | Send outbound notification to citizen on any channel |
+| `GET` | `/inbound` | List InboundMessages (filterable: `?channel=whatsapp`) |
+| `GET` | `/dispatch/{id}` | Get ChannelDispatch status |
 
 ---
 
-#### `backend/tests/test_health.py`
+### 5.5 Channel Adapters
 
-**Purpose:** Smoke tests for the app bootstrap and OpenAPI schema.  
-**Tests:** `/health` returns 200 + correct body, `/docs` is accessible, `/openapi.json` contains expected paths.  
-**Covers:** `app/main.py`
+All adapters are in `backend/app/channels/`. Every outbound sender checks for required credentials first and logs an info-level skip instead of raising — safe to run unconfigured.
+
+#### `dispatcher.py` — Central dispatcher
+**Exports:** `dispatch_inbound(*, db, channel, sender_id, raw_text, ...)`.
+
+Called by every webhook handler. Steps:
+1. Run `classify_with_watsonx()` on `raw_text` or `ai_transcript`
+2. Write `InboundMessage` row to DB (`db.flush()` for child ID)
+3. Write `MediaAttachment` rows for each attachment
+4. `db.commit()` + `db.refresh()`
+5. Call `_send_ack()` → picks the right outbound sender for `channel`
+
+#### `whatsapp.py`
+- `send_whatsapp(to, body, complaint_id)` → Twilio Messages API (`from_=whatsapp:+1…`)
+- `verify_twilio_signature(url, params, sig)` → `twilio.request_validator.RequestValidator`
+
+#### `sms.py`
+- `send_sms(to, body)` → Twilio Messages API (plain phone number)
+- `send_mms(to, body, media_url)` → Twilio Messages API with `media_url` list
+
+#### `voice.py`
+- `get_ivr_twiml(record_callback_url)` → TwiML string with `<Say>` + `<Record transcribe=true>`
+
+#### `telegram.py`
+- `send_telegram(chat_id, text)` → `POST /sendMessage`
+- `verify_telegram_secret(body, header_secret)` → `hmac.compare_digest`
+- `set_webhook(webhook_url)` → `POST /setWebhook` (call once at deploy time)
+
+#### `email_chan.py`
+- `send_email(to, subject, html_body)` → SMTP with TLS (`smtplib`)
+- `parse_email_report(raw_email_text)` → dict with `sender_id`, `raw_text`, `metadata_`
+
+#### `social.py`
+- `verify_meta_signature(body, header_signature)` → HMAC-SHA256 against `META_APP_SECRET`
+- `extract_facebook_messages(payload)` → list of `{sender_id, text, attachments}`
+- `extract_instagram_messages(payload)` → same as Facebook (identical Meta format)
+- `extract_twitter_mentions(payload)` → list of `{sender_id, sender_name, text, external_id}`
+- `send_facebook_message(recipient_id, text)` → Meta Graph API `/me/messages`
+- `send_instagram_message(recipient_id, text)` → Meta Graph API `/me/messages`
+- `send_twitter_dm(recipient_id, text)` → Twitter v2 DM Conversations API (OAuth1)
 
 ---
 
-#### `backend/tests/test_auth.py`
+### 5.6 Tests
 
-**Purpose:** Full register/login/`/me` lifecycle tests.  
-**Tests:** successful registration, duplicate email rejection, role assignment, missing fields (422), login success/wrong-password/unknown-email, JWT format validation, authenticated vs unauthenticated `/me`.  
-**Covers:** `routes/auth.py`, `app/auth.py`
+All tests run in-memory SQLite. No external services needed. Run via:
+```bash
+docker run --rm nagaraai-test:latest
+# → 75 passed in ~4.6s
+```
 
----
+#### `tests/conftest.py`
+Patches `DATABASE_URL` before any import, creates a shared SQLite engine, overrides `get_db` dependency, defines `client` (session-scoped `TestClient`), and exports helpers `register_user`, `login_user`, `auth_headers`.
 
-#### `backend/tests/test_complaints.py`
+#### `tests/test_health.py` — 4 tests
+Smoke tests: `/health` returns `{"status": "ok"}`, docs at `/docs`, OpenAPI JSON at `/openapi.json`.
 
-**Purpose:** Full complaint lifecycle tests. All `classify_with_watsonx` calls are patched with `AsyncMock` returning a fixed `AI_RESULT` dict so no network calls are made.  
-**Tests:** create (success, unauthenticated, missing title, unique ticket IDs), list (role scoping, pagination), get (existing, 404), update (status, resolve, resolved_at set, 404), rate (success, out-of-range 400).  
-**Covers:** `routes/complaints.py`, `app/watsonx.py` (mocked)
+#### `tests/test_auth.py` — 12 tests
+Register success/duplicate/missing fields; login success/wrong-password/unknown-email/JWT-returned; `GET /me` authenticated/unauthenticated/invalid-token.
 
----
+#### `tests/test_complaints.py` — 19 tests
+Create success/unauthenticated/missing-title/unique-ticket; list scoping; get existing/nonexistent; update status/resolve; rate success/out-of-range.
 
-#### `backend/tests/test_wards_analytics.py`
+#### `tests/test_wards_analytics.py` — 8 tests
+List wards; ward stats; city stats requires-auth/authenticated/non-negative; ward heatmap; contractor leaderboard.
 
-**Purpose:** Tests for ward and analytics endpoints. Inserts a real ward directly into the SQLite DB via fixture.  
-**Tests:** `GET /api/wards/` returns seeded ward, ward stats structure, city stats requires auth, city stats shape, all counts non-negative, ward-heatmap includes seeded ward, contractor leaderboard is a list.  
-**Covers:** `routes/wards.py`, `routes/analytics.py`
+#### `tests/test_watsonx.py` — 14 tests
+Local classifier — keyword matching for all 5 categories, priority keywords, confidence cap, keys present; SLA hours dict; watsonx dispatcher falls-back without credentials and on network error.
 
----
+#### `tests/test_channels.py` *(NEW)* — 18 tests
 
-#### `backend/tests/test_watsonx.py`
+*Dispatcher (5):* persists `InboundMessage`, stores `MediaAttachment` rows, accepts string `media_type`, handles empty text without crash, mock-verifies ACK is sent on WhatsApp.
 
-**Purpose:** Unit tests for the AI classifier in complete isolation (no HTTP calls, no DB).  
-**Tests:**
-- `TestLocalClassifier` (13 tests): keyword → category mapping for all 5 categories, `other` fallback, priority keywords (critical/high/low/medium default), summary content, confidence cap at 1.0, required keys present
-- `TestSLAHours` (5 tests): SLA values and coverage
-- `TestWatsonxDispatcher` (2 async tests): falls back to local when no credentials; falls back on network error (httpx patched)
+*Webhook endpoints (8):* voice returns valid TwiML, Telegram webhook accepts correct payload, Facebook hub challenge returns challenge string, wrong token → 403, Instagram hub challenge, Facebook with no `META_APP_SECRET` → 200, Twitter empty payload → 200, email ingest → 200.
 
-**Covers:** `app/watsonx.py`
-
----
-
-#### `backend/tests/__init__.py`
-
-**Purpose:** Empty package marker. Makes `tests/` a Python package (required for `from tests.conftest import ...`).
+*Management endpoints (5):* inbound list requires auth, inbound list authenticated, dispatch/{id} 404, manual dispatch complaint-not-found, manual dispatch creates record and is retrievable.
 
 ---
 
@@ -691,444 +541,119 @@ The test suite uses **SQLite in-memory** (via `aiosqlite`) instead of PostgreSQL
 
 ---
 
-#### `backend/.env` *(gitignored)*
-
-**Purpose:** Local runtime secrets. Created by copying `.env.example`. Never committed.
-**Used by:** `app/config.py` via `pydantic-settings` `env_file = ".env"`
-
----
-
-### `frontend/Dockerfile`
-
-**Purpose:** Builds the **development** React image. Runs the Create React App dev server with hot-reload.
-**Base image:** `node:20-alpine`
-**Steps:** installs deps (`npm install`), copies source, exposes 3000, runs `npm start`.
-
-> This image is for `docker compose` local development **only**. Do not use it for Kubernetes or production — use `Dockerfile.k8s` instead.
-
-**Used by:** `docker-compose.yml` → `frontend` service
-
----
-
-### `frontend/Dockerfile.k8s`
-
-**Purpose:** Multi-stage **production** image used by the Kubernetes manifests. Produces a minimal nginx-based image serving the compiled React bundle.
-
-**Stage 1 — `builder` (`node:20-alpine`):**
-1. `npm install --frozen-lockfile` — reproducible install
-2. `npm run build` — compiles React to `build/` (static HTML/JS/CSS)
-
-**Stage 2 — `nginx:1.27-alpine`:**
-1. Removes default nginx config (`/etc/nginx/conf.d/default.conf`) — the real config is injected via a Kubernetes ConfigMap at runtime
-2. Copies `build/` to `/usr/share/nginx/html`
-3. Exposes port `3000`
-
-**Key design:** `REACT_APP_API_URL` is intentionally unset during build so the app uses relative `/api` URLs. The nginx ConfigMap in `k8s/frontend/deployment.yaml` proxies `/api/*` to `backend-svc:8000`.
-
-**Depends on:** `package.json`, `src/`
-**Used by:** `k8s/frontend/deployment.yaml`, `k8s/skaffold.yaml`
-
----
-
-### `frontend/package.json`
-
-**Purpose:** Declares npm dependencies, scripts, and browser targets.
-
-**Key dependencies:**
-
-| Package | Purpose |
-|---|---|
-| `react` + `react-dom` | UI framework |
-| `react-router-dom` | Client-side routing |
-| `axios` | HTTP client |
-| `leaflet` + `react-leaflet` | Interactive map |
-| `recharts` | Bar/Pie charts on Dashboard |
-| `react-hot-toast` | Toast notifications |
-| `lucide-react` | Icon set |
-| `react-scripts` | CRA build toolchain |
-
-**Scripts:**
-- `npm start` — development server on port 3000 with hot-reload
-- `npm run build` — production static build to `frontend/build/`
-
-**Proxy:** `"proxy": "http://localhost:8000"` — all `/api/*` requests from the dev server are proxied to the backend, so CORS is not an issue in development.
-
----
-
 ### 6.1 Entry Points
 
----
-
 #### `frontend/src/index.js`
-
-**Purpose:** React DOM entry point. Mounts `<App />` into `#root` in `public/index.html`.  
-**Used by:** webpack (via CRA), nothing else imports it.
-
----
+React DOM entry. Renders `<App />` into `#root`. Wraps with `<AuthProvider>` and `<Toaster>` (react-hot-toast).
 
 #### `frontend/src/index.css`
-
-**Purpose:** Global CSS — custom properties (colour tokens, spacing), base resets, layout classes (`.app-shell`, `.sidebar`, `.main-content`, `.stat-card`, `.card`, `.table-wrap`, `.spinner`), and responsive utilities.  
-**Used by:** `index.js` (single global import)
-
----
+CSS custom properties: `--accent`, `--surface`, `--border`, `--text`, `--muted`, `--success`, `--danger`, badge and button classes, modal and form styles.
 
 #### `frontend/src/App.js`
+React Router 6 `<Routes>`. Public routes: `/login`, `/register`. Private routes wrapped in `<RequireAuth>`: renders `<AppShell>` with sub-routes for Dashboard, Complaints, WardMap.
 
-**Purpose:** Root React component. Wraps the entire app in `BrowserRouter`, `AuthProvider`, and the `Toaster`. Defines the top-level route guard:
-
-- `/login` → `<Login />` (redirects to `/` if already logged in)
-- `/register` → `<Register />` (redirects to `/` if already logged in)
-- `/*` → `<AppShell />` (itself redirects to `/login` if not authenticated)
-
-**Dependencies:** `react-router-dom`, `react-hot-toast`, `context/AuthContext`, `components/AppShell`, `pages/Login`, `pages/Register`  
-**Used by:** `index.js`
+#### `frontend/src/setupProxy.js`
+CRA HTTP proxy configuration. Forwards all `/api/*` requests to `process.env.REACT_APP_PROXY_TARGET` (default `http://localhost:8000`). Set `REACT_APP_PROXY_TARGET=http://backend:8000` in Docker Compose so the frontend container resolves the backend by service name, not `localhost`.
 
 ---
 
 ### 6.2 API Client
 
----
-
 #### `frontend/src/api.js`
-
-**Purpose:** Single Axios instance used by all pages and components. Centralises the base URL and auth token injection.
-
-**Configuration:**
-- `baseURL: '/api'` — all calls are relative (e.g., `api.get('/complaints/')` → `GET /api/complaints/`)
-- **Request interceptor:** reads `localStorage["token"]` and sets `Authorization: Bearer <token>` on every request
-- **Response interceptor:** on `401 Unauthorized`, clears localStorage and redirects to `/login`
-
-**Dependencies:** `axios`  
-**Used by:** `pages/Dashboard.js`, `pages/Complaints.js`, `pages/WardMap.js`, `pages/Login.js`, `pages/Register.js`, `components/ReportModal.js`, `components/ComplaintDetail.js`
+Axios instance with `baseURL: ""`. Request interceptor injects `Authorization: Bearer <token>` from `localStorage`. Response interceptor redirects to `/login` on 401.
 
 ---
 
 ### 6.3 Auth Context
 
----
-
 #### `frontend/src/context/AuthContext.js`
-
-**Purpose:** Global React context for authentication state. Persists across page refreshes via `localStorage`.
-
-**Exports:**
-- `AuthProvider` — wraps the app; provides `{ user, login, logout }` to all descendants
-- `useAuth()` — hook to consume the context
-
-**State:**
-- `user` — parsed `UserOut` object (or `null`); initialised from `localStorage["user"]`
-
-**Methods:**
-- `login(userData, token)` — saves to localStorage + updates state
-- `logout()` — clears localStorage + sets `user = null`
-
-**Used by:** `App.js`, `components/AppShell.js`, `components/Sidebar.js`, `pages/Dashboard.js`
+React context with `useAuth()` hook. Provides `user`, `login(token, user)`, `logout()`. Persists to `localStorage`. `login()` decodes the JWT to get the user object; `logout()` clears storage and redirects.
 
 ---
 
 ### 6.4 Pages
 
----
-
 #### `frontend/src/pages/Login.js`
-
-**Purpose:** Login form. On success, calls `AuthContext.login()` and navigates to `/`.  
-**API call:** `POST /api/auth/login` via `api.js`  
-**Dependencies:** `api.js`, `context/AuthContext`, `react-router-dom`, `react-hot-toast`
-
----
+Email + password form. `POST /api/auth/login`. Calls `AuthContext.login()` on success. Shows error toast on failure.
 
 #### `frontend/src/pages/Register.js`
-
-**Purpose:** Registration form with role and ward selection.  
-**API calls:** `GET /api/wards/` (to populate ward dropdown), `POST /api/auth/register`  
-**Dependencies:** `api.js`, `react-router-dom`, `react-hot-toast`
-
----
+Name / email / password / role dropdown. `POST /api/auth/register`. Redirects to `/login` after success.
 
 #### `frontend/src/pages/Dashboard.js`
-
-**Purpose:** City analytics overview. Displays 6 KPI stat cards, a grouped bar chart (ward risk + open complaints), a pie chart (issue category breakdown), and a contractor compliance leaderboard table.
-
-**API calls (parallel `Promise.all`):**
-- `GET /api/analytics/city` → `CityStats`
-- `GET /api/analytics/ward-heatmap` → ward risk array
-- `GET /api/analytics/contractors` → contractor leaderboard
-
-**Dependencies:** `api.js`, `context/AuthContext`, `recharts`  
-**Child components:** `StatCard` (inline)
-
----
+Fetches `GET /api/analytics/city` and `GET /api/analytics/ward-heatmap`. Renders KPI cards (total complaints, open, resolved today, avg resolution hours) and a Recharts bar chart of ward open counts.
 
 #### `frontend/src/pages/Complaints.js`
-
-**Purpose:** Issue list with filters, sorting, and action buttons. Citizens see "Report New Issue" button that opens `ReportModal`. Officers see status update and assign controls. Clicking a row opens `ComplaintDetail`.
-
-**API calls:** `GET /api/complaints/` (with filter params), `PATCH /api/complaints/{id}`  
-**Dependencies:** `api.js`, `context/AuthContext`, `components/ReportModal`, `components/ComplaintDetail`, `react-hot-toast`
-
----
+Fetches complaint list with role-scoped filter. Renders a table with ticket ID, title, category badge, priority badge, status badge, SLA countdown. Opens `<ReportModal>` for new reports; opens `<ComplaintDetail>` for existing ones.
 
 #### `frontend/src/pages/WardMap.js`
-
-**Purpose:** Leaflet choropleth map of Bengaluru wards. Colour-codes wards by flood risk score. Clicking a ward shows a popup with open complaint count and cleanliness score.
-
-**API calls:** `GET /api/analytics/ward-heatmap`  
-**Dependencies:** `api.js`, `leaflet`, `react-leaflet`
-
-> Uses hardcoded GeoJSON polygon coordinates for the 8 seeded Bengaluru wards.
+Renders a Leaflet map centered on Bengaluru. Fetches ward heatmap data, draws GeoJSON polygons colour-coded by `flood_risk_score`. Clicking a ward shows a tooltip with its stats.
 
 ---
 
 ### 6.5 Components
 
----
-
 #### `frontend/src/components/AppShell.js`
-
-**Purpose:** Authenticated layout wrapper. Renders `<Sidebar />` on the left and a `<div className="main-content">` on the right. Contains the page-level topbar (page title + "Powered by IBM watsonx.ai" badge) and the inner `<Routes>` for the three main pages.  
-Redirects to `/login` if `user` is null.
-
-**Inner routes:**
-- `/` → `Dashboard`
-- `/complaints` → `Complaints`
-- `/map` → `WardMap`
-- `*` → redirect to `/`
-
-**Dependencies:** `context/AuthContext`, `components/Sidebar`, `pages/Dashboard`, `pages/Complaints`, `pages/WardMap`  
-**Used by:** `App.js`
-
----
+Authenticated shell: `<Sidebar>` on the left, page content on the right. Renders the correct page based on the current route. Provides a "Report Issue" floating button for citizens.
 
 #### `frontend/src/components/Sidebar.js`
-
-**Purpose:** Left navigation sidebar. Renders role-specific nav items (each role gets a different label for the same routes). Shows user avatar (first letter of name), full name, role badge, and a logout button.
-
-**Role → nav label mapping:**
-- `citizen`: Dashboard, My Reports, Ward Map
-- `field_officer`: Dashboard, My Tasks, Ward Map
-- `ward_officer`: Dashboard, Ward Issues, Ward Map
-- `commissioner`: City Dashboard, All Issues, City Map
-
-**Dependencies:** `context/AuthContext`, `react-router-dom`  
-**Used by:** `components/AppShell.js`
-
----
+Renders nav links appropriate to the user's role. Shows the current user's name and role chip. Logout button. Active link highlighting via `useLocation`.
 
 #### `frontend/src/components/ReportModal.js`
+Citizen complaint form. Fields: title, category, description, address, latitude/longitude (with "Use My Location" button), image URL, **channel selector** *(new)*.
 
-**Purpose:** Modal dialog for citizens to file a new complaint. Fields: title, description, category (dropdown), address, latitude/longitude, image URL, ward selection.  
-On submit, calls `POST /api/complaints/` and shows the AI-generated classification result in a toast.
+The channel selector lets citizens indicate how they prefer to interact:
+- Web (default) — this form
+- WhatsApp, Telegram, SMS, Email — shows a contextual hint about reporting directly on that channel
 
-**Dependencies:** `api.js`, `react-hot-toast`  
-**Used by:** `pages/Complaints.js`
-
----
+Submits `POST /api/complaints/`. On success shows a toast with the ticket ID and AI-assigned priority.
 
 #### `frontend/src/components/ComplaintDetail.js`
-
-**Purpose:** Side panel / modal showing full complaint details including AI classification metadata, SLA deadline countdown, status history (`updates[]`), and (for officers) status update controls and assignee selection.
-
-**API calls:** `PATCH /api/complaints/{id}` (status update), `POST /api/complaints/{id}/rate` (citizen rating)  
-**Dependencies:** `api.js`, `context/AuthContext`, `react-hot-toast`  
-**Used by:** `pages/Complaints.js`
+Displays full complaint detail in a modal panel. Sections:
+- AI watsonx.ai analysis block (category, confidence, summary)
+- Status / priority / category / dates grid
+- Image preview
+- Activity timeline (ComplaintUpdates)
+- Status-update buttons (officers only)
+- **📣 Send Notification panel** *(new)* — officers can dispatch a notification on WhatsApp/SMS/Telegram/Email to any recipient. Calls `POST /api/channels/dispatch`.
+- Star rating (citizens, resolved complaints only)
 
 ---
 
 ## 7. Kubernetes — `k8s/`
 
-The `k8s/` directory contains everything needed to deploy NagaraAI on a local Kubernetes cluster (minikube or kind). All manifests target the `nagaraai` namespace.
-
-**Deployment order (applied sequentially):**
-```
-namespace → secrets → postgres (pvc → deployment → service) → backend → frontend → ingress
-```
-
----
-
 ### 7.1 Cluster Config
 
----
-
 #### `k8s/namespace.yaml`
-
-**Purpose:** Creates the `nagaraai` Kubernetes namespace. All other resources live inside this namespace.
-**Apply first** — every other manifest references `namespace: nagaraai`.
-
----
+Creates the `nagaraai` namespace used by all other manifests.
 
 #### `k8s/kind-config.yaml`
-
-**Purpose:** kind cluster configuration for local Kubernetes development. Configures a single control-plane node with:
-- `node-labels: "ingress-ready=true"` — required by the nginx ingress controller
-- Three `extraPortMappings`: host port `80` → container `80` (ingress HTTP), host `443` → container `443` (HTTPS), host `30080` → container `30080` (direct NodePort access)
-
-**Used by:** `kind create cluster --name nagaraai --config k8s/kind-config.yaml`
-
----
+kind cluster with one control-plane node, two worker nodes, and port mappings 80→30080 and 443→30443 for ingress.
 
 #### `k8s/skaffold.yaml`
-
-**Purpose:** Skaffold v2 configuration for an automated build-deploy-watch dev loop. Builds both images, applies all manifests in the correct order, and port-forwards `localhost:3000` → frontend and `localhost:8000` → backend.
-
-**Build artifacts:**
-
-| Image | Context | Dockerfile |
-|---|---|---|
-| `nagaraai-backend` | `./backend` | `Dockerfile` |
-| `nagaraai-frontend` | `./frontend` | `Dockerfile.k8s` (production build) |
-
-**`local.push: false`** — images are built directly into minikube's Docker daemon (no registry needed).
-
-**Usage:**
-```bash
-# minikube
-eval $(minikube docker-env) && skaffold dev --filename k8s/skaffold.yaml
-
-# kind
-skaffold dev --filename k8s/skaffold.yaml --default-repo ""
-```
-
----
+Skaffold v2 dev-loop: builds both Docker images on file change, applies all manifests via `kubectl`, tails logs.
 
 #### `k8s/README.md`
-
-**Purpose:** Step-by-step Kubernetes deployment guide covering minikube (Option A), kind (Option B), and Skaffold (Option C). Includes useful `kubectl` commands, seed data instructions, secrets rotation, teardown, and an ASCII cluster architecture diagram.
-
----
+Step-by-step Kubernetes deployment guide (kind / minikube / cloud cluster).
 
 ### 7.2 Secrets
-
----
-
 #### `k8s/secrets/secrets.yaml`
-
-**Purpose:** Kubernetes `Secret` resource (`nagaraai-secrets`) holding all sensitive values as base64-encoded strings.
-
-| Key | Decoded value | Used by |
-|---|---|---|
-| `POSTGRES_USER` | `nagaraai` | postgres pod env |
-| `POSTGRES_PASSWORD` | `nagaraai123` | postgres pod env |
-| `POSTGRES_DB` | `nagaraai_db` | postgres pod env |
-| `DATABASE_URL` | `postgresql://nagaraai:nagaraai123@postgres-svc:5432/nagaraai_db` | backend pod env |
-| `SECRET_KEY` | `change-me-in-local-dev` | backend pod env — **must be changed for any real deployment** |
-| `WATSONX_API_KEY` | `""` | backend pod env — set your IBM Cloud key to enable AI classification |
-| `WATSONX_PROJECT_ID` | `""` | backend pod env |
-
-> Note: the `DATABASE_URL` hostname is `postgres-svc` (the Kubernetes Service name), not `localhost` or `db`.
-
-**To update a secret value:**
-```bash
-echo -n "new-value" | base64    # get encoded string
-# edit secrets.yaml, then:
-kubectl apply -f k8s/secrets/secrets.yaml
-kubectl -n nagaraai rollout restart deployment/backend
-```
-
----
+Kubernetes `Secret` with base64-encoded: `DATABASE_URL`, `SECRET_KEY`, `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`. Referenced by backend `Deployment` as `envFrom.secretRef`.
 
 ### 7.3 PostgreSQL
-
----
-
-#### `k8s/postgres/pvc.yaml`
-
-**Purpose:** 1 Gi `PersistentVolumeClaim` (`postgres-pvc`, `ReadWriteOnce`) for database storage. Uses the cluster's default `StorageClass` (works on both minikube and kind without modification).
-
-**Mounted at:** `/var/lib/postgresql/data` inside the postgres pod.
-
----
-
-#### `k8s/postgres/deployment.yaml`
-
-**Purpose:** Runs `postgres:16-alpine` as a single-replica Deployment with `strategy: Recreate` (prevents two writers accessing the PVC simultaneously).
-
-**Key config:**
-- Credentials injected from `nagaraai-secrets` via `secretKeyRef`
-- **readinessProbe:** `pg_isready -U nagaraai -d nagaraai_db` — backend initContainer waits for this
-- **livenessProbe:** same command, 30 s initial delay
-- Resource limits: `500m` CPU, `512Mi` memory
-
----
-
-#### `k8s/postgres/service.yaml`
-
-**Purpose:** ClusterIP Service `postgres-svc` exposing port `5432`. Internal DNS name `postgres-svc.nagaraai.svc.cluster.local` is what `DATABASE_URL` in secrets resolves to.
-
----
+`postgres/pvc.yaml` — 1 Gi `PersistentVolumeClaim`.
+`postgres/deployment.yaml` — `postgres:16-alpine` pod with readiness probe (`pg_isready`).
+`postgres/service.yaml` — `ClusterIP` `postgres-svc` on port 5432.
 
 ### 7.4 Backend
-
----
-
-#### `k8s/backend/deployment.yaml`
-
-**Purpose:** Runs the FastAPI backend as a single-replica Deployment.
-
-**Key config:**
-- **initContainer** (`busybox:1.36`): polls `nc -z postgres-svc 5432` every 2 s until Postgres accepts connections — prevents the backend from crashing before the DB is ready
-- `imagePullPolicy: IfNotPresent` — uses the locally loaded image (minikube/kind)
-- All env vars (`DATABASE_URL`, `SECRET_KEY`, `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`) injected from `nagaraai-secrets`
-- **readinessProbe:** `GET /health` on port 8000, 10 s initial delay
-- **livenessProbe:** `GET /health`, 30 s initial delay
-- Resource limits: `500m` CPU, `512Mi` memory
-
----
-
-#### `k8s/backend/service.yaml`
-
-**Purpose:** ClusterIP Service `backend-svc` exposing port `8000`. Referenced by the frontend nginx proxy config and the ingress rule.
-
----
+`backend/deployment.yaml` — FastAPI pod with `initContainer` running `python seed.py`, liveness probe `GET /health`, env vars from secret. Replicas: 1.
+`backend/service.yaml` — `ClusterIP` `backend-svc` on port 8000.
 
 ### 7.5 Frontend
-
----
-
-#### `k8s/frontend/deployment.yaml`
-
-**Purpose:** Contains two Kubernetes resources in a single file:
-
-**1 — ConfigMap `frontend-nginx-conf`:** Provides the nginx `default.conf` mounted into the pod. Configures nginx to:
-- Listen on port `3000`
-- Serve the React static build from `/usr/share/nginx/html`
-- Proxy `location /api/` → `http://backend-svc:8000` (passes through all API calls)
-- `location /` with `try_files $uri $uri/ /index.html` — enables React client-side routing
-
-**2 — Deployment `frontend`:** Runs `nagaraai-frontend:latest` (built from `Dockerfile.k8s`).
-- ConfigMap volume mounted at `/etc/nginx/conf.d/default.conf`
-- **readinessProbe:** `GET /` on port 3000
-- Resource limits: `200m` CPU, `256Mi` memory
-
----
-
-#### `k8s/frontend/service.yaml`
-
-**Purpose:** NodePort Service `frontend-svc` exposing port `3000` with `nodePort: 30080`.
-
-- Access via ingress: `http://localhost` (port 80 via nginx-ingress)
-- Direct access (no tunnel): `http://localhost:30080`
-
----
+`frontend/deployment.yaml` — Nginx pod serving the React build. `ConfigMap` injects `nginx.conf` with `/api` proxy to `backend-svc:8000`.
+`frontend/service.yaml` — `NodePort` `frontend-svc` on port 3000, `nodePort: 30080`.
 
 ### 7.6 Ingress
-
----
-
-#### `k8s/ingress/ingress.yaml`
-
-**Purpose:** nginx Ingress resource routing all external traffic to the correct service based on path prefix.
-
-| Path | Type | Backend Service | Description |
-|---|---|---|---|
-| `/api` | Prefix | `backend-svc:8000` | All API calls go directly to FastAPI |
-| `/` | Prefix | `frontend-svc:3000` | Everything else goes to the React frontend |
-
-**Annotations:**
-- `proxy-read-timeout: "60"` and `proxy-send-timeout: "60"` — allows for slow watsonx.ai API calls
-
-**Ingress class:** `nginx` — requires the nginx ingress controller installed in the cluster.
+`ingress/ingress.yaml` — `nginx` ingress class. Routes `/api` → `backend-svc:8000`, `/` → `frontend-svc:3000`.
 
 ---
 
@@ -1136,51 +661,68 @@ kubectl -n nagaraai rollout restart deployment/backend
 
 ```
 docker-compose.yml
-  ├── backend/Dockerfile ──────────────────────────────────────────┐
-  │     └── requirements.txt                                       │
-  │           └── app/                                             │
-  │                 ├── config.py ← .env / environment vars        │
-  │                 ├── database.py ← config.py                    │
-  │                 ├── models.py ← database.py                    │
-  │                 ├── schemas.py ← models.py                     │
-  │                 ├── auth.py ← config.py, database.py, models   │
-  │                 ├── watsonx.py ← config.py                     │
-  │                 ├── main.py ← database.py, routes/*            │
-  │                 └── routes/
-  │                       ├── auth.py ← database, models, schemas, auth
-  │                       ├── complaints.py ← database, models, schemas, auth, watsonx
-  │                       ├── wards.py ← database, models, schemas
-  │                       └── analytics.py ← database, models, schemas, auth
+  ├── backend/Dockerfile
+  │     └── requirements.txt
+  │           └── app/
+  │                 ├── config.py ← .env / environment vars
+  │                 ├── database.py ← config.py
+  │                 ├── models.py ← database.py
+  │                 ├── schemas.py ← models.py
+  │                 ├── auth.py ← config.py, database.py, models
+  │                 ├── watsonx.py ← config.py
+  │                 ├── main.py ← database.py, routes/*, channels/dispatcher
+  │                 ├── routes/
+  │                 │     ├── auth.py ← database, models, schemas, auth
+  │                 │     ├── complaints.py ← database, models, schemas, auth, watsonx
+  │                 │     ├── wards.py ← database, models, schemas
+  │                 │     ├── analytics.py ← database, models, schemas, auth
+  │                 │     └── channels.py ← database, models, schemas, auth,
+  │                 │                       channels/dispatcher, channels/*adapters,
+  │                 │                       config
+  │                 └── channels/
+  │                       ├── dispatcher.py ← models, watsonx, channels/*adapters
+  │                       ├── whatsapp.py ← config
+  │                       ├── sms.py ← config
+  │                       ├── voice.py ← config
+  │                       ├── telegram.py ← config
+  │                       ├── email_chan.py ← config
+  │                       └── social.py ← config
   │
-  ├── backend/Dockerfile.test ────────────────────────────────────┐
-  │     └── (same requirements.txt + tests/)                      │
-  │           └── tests/conftest.py ← app/main.py, app/database   │
+  ├── backend/Dockerfile.test
+  │     └── tests/conftest.py ← app/main.py, app/database
+  │           ├── test_health.py
+  │           ├── test_auth.py
+  │           ├── test_complaints.py
+  │           ├── test_wards_analytics.py
+  │           ├── test_watsonx.py
+  │           └── test_channels.py ← channels/dispatcher, routes/channels
   │
-  ├── frontend/Dockerfile (dev server) ─────────────────────────── ┐
-  │     └── package.json                                           │
-  │           └── src/                                             │
-  │                 ├── index.js → App.js                          │
+  ├── frontend/Dockerfile (dev server)
+  │     └── package.json
+  │           └── src/
+  │                 ├── index.js → App.js
   │                 ├── App.js → AuthContext, AppShell, Login, Register
-  │                 ├── api.js (used by all pages + components)    │
-  │                 ├── context/AuthContext.js                     │
+  │                 ├── api.js (used by all pages + components)
+  │                 ├── setupProxy.js (dev proxy only)
+  │                 ├── context/AuthContext.js
   │                 ├── pages/
-  │                 │     ├── Login.js ← api, AuthContext          │
-  │                 │     ├── Register.js ← api                    │
-  │                 │     ├── Dashboard.js ← api, AuthContext      │
+  │                 │     ├── Login.js ← api, AuthContext
+  │                 │     ├── Register.js ← api
+  │                 │     ├── Dashboard.js ← api, AuthContext
   │                 │     ├── Complaints.js ← api, AuthContext, ReportModal, ComplaintDetail
-  │                 │     └── WardMap.js ← api                     │
+  │                 │     └── WardMap.js ← api
   │                 └── components/
   │                       ├── AppShell.js ← AuthContext, Sidebar, pages/*
-  │                       ├── Sidebar.js ← AuthContext             │
-  │                       ├── ReportModal.js ← api                 │
-  │                       └── ComplaintDetail.js ← api, AuthContext│
+  │                       ├── Sidebar.js ← AuthContext
+  │                       ├── ReportModal.js ← api           [+ channel selector]
+  │                       └── ComplaintDetail.js ← api, AuthContext  [+ notify panel → /api/channels/dispatch]
   │
-  ├── frontend/Dockerfile.k8s (production) ────────────────────────┐
-  │     └── same src/ → npm run build → nginx static serve         │
+  ├── frontend/Dockerfile.k8s (production)
+  │     └── same src/ → npm run build → nginx static serve
   │           └── k8s/frontend/deployment.yaml (ConfigMap nginx conf)
   │
-  ├── db (postgres:16-alpine) ─────────────────────────────────────┐
-  │     └── pgdata volume (docker) / postgres-pvc (k8s)            │
+  ├── db (postgres:16-alpine)
+  │     └── pgdata volume (docker) / postgres-pvc (k8s)
   │
   └── k8s/
         ├── secrets/secrets.yaml ← all env vars (base64)
@@ -1194,19 +736,83 @@ docker-compose.yml
 
 ## 9. Environment Variables Reference
 
-| Variable | Service | Required | Default | Purpose |
-|---|---|---|---|---|
-| `DATABASE_URL` | backend | Yes | `postgresql://nagaraai:nagaraai123@localhost:5432/nagaraai_db` | SQLAlchemy connection string |
-| `SECRET_KEY` | backend | **Yes — change in prod** | `dev-secret-key` | JWT signing secret |
-| `ALGORITHM` | backend | No | `HS256` | JWT algorithm |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | backend | No | `1440` | Token TTL (minutes) |
-| `WATSONX_API_KEY` | backend | No | `""` | IBM Cloud API key — empty → local fallback |
-| `WATSONX_PROJECT_ID` | backend | No | `""` | watsonx project ID |
-| `WATSONX_URL` | backend | No | `https://us-south.ml.cloud.ibm.com` | watsonx regional endpoint |
-| `REACT_APP_API_URL` | frontend | No | (unused at runtime) | Informational; proxy in package.json handles routing |
-| `POSTGRES_USER` | db | Yes (Docker) | `nagaraai` | PostgreSQL superuser |
-| `POSTGRES_PASSWORD` | db | Yes (Docker) | `nagaraai123` | PostgreSQL password |
-| `POSTGRES_DB` | db | Yes (Docker) | `nagaraai_db` | PostgreSQL database name |
+### Core
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | Yes | `postgresql://nagaraai:nagaraai123@localhost:5432/nagaraai_db` | SQLAlchemy connection string |
+| `SECRET_KEY` | **Yes — change in prod** | `dev-secret-key` | JWT signing secret |
+| `ALGORITHM` | No | `HS256` | JWT algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | `1440` | Token TTL (24 h) |
+
+### IBM watsonx.ai
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `WATSONX_API_KEY` | No | `""` | IBM Cloud API key — empty → local fallback |
+| `WATSONX_PROJECT_ID` | No | `""` | watsonx project ID |
+| `WATSONX_URL` | No | `https://us-south.ml.cloud.ibm.com` | watsonx regional endpoint |
+
+### Twilio (WhatsApp / SMS / Voice)
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `TWILIO_ACCOUNT_SID` | No | `""` | Account SID |
+| `TWILIO_AUTH_TOKEN` | No | `""` | Auth token (also used for HMAC signature verify) |
+| `TWILIO_PHONE_NUMBER` | No | `""` | E.164 number for SMS/Voice |
+| `TWILIO_WHATSAPP_NUMBER` | No | `""` | `whatsapp:+1…` for WhatsApp |
+| `TWILIO_VERIFY_SIGNATURE` | No | `true` | Set `false` for local dev with ngrok |
+
+### Telegram
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | No | `""` | Bot token from @BotFather |
+| `TELEGRAM_WEBHOOK_SECRET` | No | `""` | Secret token for webhook header verification |
+
+### Email (SMTP)
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `SMTP_HOST` | No | `smtp.gmail.com` | SMTP server |
+| `SMTP_PORT` | No | `587` | SMTP port |
+| `SMTP_USER` | No | `""` | SMTP username |
+| `SMTP_PASSWORD` | No | `""` | SMTP password / app password |
+| `SMTP_FROM` | No | `nagaraai@example.com` | From address |
+
+### Meta (Facebook / Instagram)
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `META_APP_SECRET` | No | `""` | App secret for X-Hub-Signature-256 verification |
+| `META_VERIFY_TOKEN` | No | `nagaraai-verify` | Hub challenge verify token |
+| `META_PAGE_ACCESS_TOKEN` | No | `""` | Facebook page token (outbound) |
+| `META_IG_ACCESS_TOKEN` | No | `""` | Instagram business token (outbound) |
+
+### Twitter/X
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `TWITTER_API_KEY` | No | `""` | Consumer API key |
+| `TWITTER_API_SECRET` | No | `""` | Consumer API secret |
+| `TWITTER_ACCESS_TOKEN` | No | `""` | User access token |
+| `TWITTER_ACCESS_SECRET` | No | `""` | User access token secret |
+| `TWITTER_BEARER_TOKEN` | No | `""` | Bearer token (read-only streams) |
+
+### App
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `APP_BASE_URL` | No | `https://nagaraai.example.com` | Public base URL — used in Twilio voice transcription callback |
+
+### Frontend / Docker
+
+| Variable | Service | Default | Purpose |
+|---|---|---|---|
+| `REACT_APP_PROXY_TARGET` | frontend | `http://localhost:8000` | Dev-proxy target — set `http://backend:8000` in Docker |
+| `POSTGRES_USER` | db | `nagaraai` | PostgreSQL user |
+| `POSTGRES_PASSWORD` | db | `nagaraai123` | PostgreSQL password |
+| `POSTGRES_DB` | db | `nagaraai_db` | PostgreSQL database name |
 
 ---
 
@@ -1215,10 +821,11 @@ docker-compose.yml
 ```
 users
   id PK, name, email (unique), phone (unique), hashed_password,
-  role ENUM, ward_id FK→wards.id, is_active, created_at
+  role ENUM(citizen|field_officer|ward_officer|commissioner),
+  ward_id FK→wards.id, is_active BOOL, created_at TIMESTAMP
 
 wards
-  id PK, name, zone, population,
+  id PK, name, zone, population INT,
   flood_risk_score FLOAT, cleanliness_score FLOAT
 
 contractors
@@ -1226,27 +833,137 @@ contractors
   compliance_score FLOAT, total_assigned INT, total_resolved INT, created_at
 
 complaints
-  id PK, ticket_id (unique), title, description, category ENUM, priority ENUM, status ENUM,
-  latitude, longitude, address, image_url,
-  ai_classification, ai_confidence, ai_summary,
+  id PK, ticket_id VARCHAR(20) unique,
+  title, description TEXT,
+  category ENUM, priority ENUM, status ENUM,
+  latitude FLOAT, longitude FLOAT, address,
+  image_url, ai_classification, ai_confidence FLOAT, ai_summary TEXT,
   reporter_id FK→users.id, assignee_id FK→users.id,
   ward_id FK→wards.id, contractor_id FK→contractors.id,
-  sla_deadline, resolved_at, citizen_rating INT(1–5), created_at, updated_at
+  sla_deadline TIMESTAMP, resolved_at TIMESTAMP,
+  citizen_rating INT(1-5), created_at, updated_at
 
 complaint_updates
   id PK, complaint_id FK→complaints.id, updated_by FK→users.id,
   status ENUM, note TEXT, created_at
+
+── NEW (multi-channel intake) ─────────────────────────────────────────────
+
+inbound_messages
+  id PK,
+  channel ENUM(whatsapp|telegram|sms|mms|email|voice|facebook|instagram|twitter_x|web|api),
+  external_id VARCHAR(255),          -- platform message ID
+  sender_id VARCHAR(255),            -- phone / handle / chat_id
+  sender_name VARCHAR(255),
+  raw_text TEXT,                     -- original message body
+  language VARCHAR(20),
+  ai_transcript TEXT,                -- voice → text (from Twilio transcription)
+  ai_summary TEXT,                   -- watsonx one-liner
+  ai_category VARCHAR(100),
+  ai_priority VARCHAR(50),
+  ai_confidence FLOAT,
+  location_text VARCHAR(500),
+  latitude FLOAT, longitude FLOAT,
+  complaint_id FK→complaints.id,     -- NULL until promoted to Complaint
+  is_processed BOOL,
+  metadata_ JSON,                    -- raw platform-specific extras
+  created_at
+
+media_attachments
+  id PK, message_id FK→inbound_messages.id,
+  media_type ENUM(image|video|audio|document|location),
+  url VARCHAR(1000),
+  mime_type VARCHAR(100),
+  file_size_bytes INT,
+  ai_description TEXT,               -- future AI image caption / transcript
+  created_at
+
+channel_dispatches
+  id PK, complaint_id FK→complaints.id,
+  channel ENUM,
+  recipient VARCHAR(255),            -- phone / email / chat_id
+  message_body TEXT,
+  external_id VARCHAR(255),          -- platform message send ID
+  status VARCHAR(50),                -- queued | sent | delivered | failed
+  created_at
 ```
 
 **Foreign key summary:**
 
 ```
-users.ward_id              → wards.id
-complaints.reporter_id     → users.id
-complaints.assignee_id     → users.id
-complaints.ward_id         → wards.id
-complaints.contractor_id   → contractors.id
-contractors.ward_id        → wards.id
-complaint_updates.complaint_id → complaints.id
-complaint_updates.updated_by   → users.id
+users.ward_id                    → wards.id
+complaints.reporter_id           → users.id
+complaints.assignee_id           → users.id
+complaints.ward_id               → wards.id
+complaints.contractor_id         → contractors.id
+contractors.ward_id              → wards.id
+complaint_updates.complaint_id   → complaints.id
+complaint_updates.updated_by     → users.id
+inbound_messages.complaint_id    → complaints.id  (nullable)
+media_attachments.message_id     → inbound_messages.id  (cascade delete)
+channel_dispatches.complaint_id  → complaints.id
 ```
+
+---
+
+## 11. API Endpoint Reference
+
+### Auth — `/api/auth`
+
+| Method | Path | Auth | Body / Params | Returns |
+|---|---|---|---|---|
+| POST | `/api/auth/register` | No | `UserCreate` | `Token` |
+| POST | `/api/auth/login` | No | `UserLogin` | `Token` |
+| GET | `/api/auth/me` | Bearer | — | `UserOut` |
+
+### Complaints — `/api/complaints`
+
+| Method | Path | Auth | Body / Params | Returns |
+|---|---|---|---|---|
+| POST | `/api/complaints/` | Bearer | `ComplaintCreate` | `ComplaintOut` 201 |
+| GET | `/api/complaints/` | Bearer | `?skip=0&limit=50` | `List[ComplaintOut]` |
+| GET | `/api/complaints/{id}` | Bearer | — | `ComplaintOut` |
+| PATCH | `/api/complaints/{id}` | Bearer | `ComplaintUpdate` | `ComplaintOut` |
+| POST | `/api/complaints/{id}/rate` | Bearer | `ComplaintRating` | `ComplaintOut` |
+
+### Wards — `/api/wards`
+
+| Method | Path | Auth | Returns |
+|---|---|---|---|
+| GET | `/api/wards/` | No | `List[WardOut]` |
+| GET | `/api/wards/{id}/stats` | No | `WardStats` |
+
+### Analytics — `/api/analytics`
+
+| Method | Path | Auth | Returns |
+|---|---|---|---|
+| GET | `/api/analytics/city` | Bearer | `CityStats` |
+| GET | `/api/analytics/ward-heatmap` | Bearer | `List[WardStats]` |
+| GET | `/api/analytics/contractors` | Bearer | `List[ContractorOut]` |
+
+### Channels — `/api/channels`
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| POST | `/api/channels/webhook/whatsapp` | None (Twilio HMAC) | Form-encoded |
+| POST | `/api/channels/webhook/sms` | None (Twilio HMAC) | Form-encoded |
+| POST | `/api/channels/webhook/voice` | None | Returns TwiML |
+| POST | `/api/channels/webhook/voice/transcription` | None | Twilio callback |
+| POST | `/api/channels/webhook/telegram` | None (secret header) | JSON Update |
+| GET | `/api/channels/webhook/facebook` | None | Hub challenge |
+| POST | `/api/channels/webhook/facebook` | None (SHA256) | Meta payload |
+| GET | `/api/channels/webhook/instagram` | None | Hub challenge |
+| POST | `/api/channels/webhook/instagram` | None (SHA256) | Meta payload |
+| POST | `/api/channels/webhook/twitter` | None | Account Activity JSON |
+| POST | `/api/channels/webhook/email` | None | `{from, subject, body}` |
+| POST | `/api/channels/dispatch` | Bearer | `DispatchRequest` → `ChannelDispatchOut` |
+| GET | `/api/channels/inbound` | Bearer | `?channel=&skip=&limit=` → `List[InboundMessageOut]` |
+| GET | `/api/channels/dispatch/{id}` | Bearer | `ChannelDispatchOut` |
+
+### System
+
+| Method | Path | Auth | Returns |
+|---|---|---|---|
+| GET | `/health` | No | `{"status": "ok", "service": "NagaraAI"}` |
+| GET | `/docs` | No | Swagger UI |
+| GET | `/openapi.json` | No | OpenAPI 3 spec |

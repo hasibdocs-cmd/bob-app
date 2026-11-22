@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Enum, ForeignKey, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -35,6 +35,28 @@ class IssueStatus(str, enum.Enum):
     resolved = "resolved"
     closed = "closed"
     escalated = "escalated"
+
+
+class ChannelType(str, enum.Enum):
+    whatsapp = "whatsapp"
+    telegram = "telegram"
+    sms = "sms"
+    mms = "mms"
+    email = "email"
+    voice = "voice"
+    twitter_x = "twitter_x"
+    facebook = "facebook"
+    instagram = "instagram"
+    web = "web"
+    api = "api"
+
+
+class MediaType(str, enum.Enum):
+    image = "image"
+    video = "video"
+    audio = "audio"
+    document = "document"
+    location = "location"
 
 
 class User(Base):
@@ -122,6 +144,68 @@ class Complaint(Base):
     ward = relationship("Ward", back_populates="complaints")
     contractor = relationship("Contractor", back_populates="complaints")
     updates = relationship("ComplaintUpdate", back_populates="complaint")
+    inbound_messages = relationship("InboundMessage", back_populates="complaint")
+    dispatches = relationship("ChannelDispatch", back_populates="complaint")
+
+
+class InboundMessage(Base):
+    """Raw intake from any external channel before it becomes a Complaint."""
+    __tablename__ = "inbound_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    channel = Column(Enum(ChannelType), nullable=False)
+    external_id = Column(String(255), nullable=True, index=True)   # platform message ID
+    sender_id = Column(String(255), nullable=True)                 # phone / handle / chat_id
+    sender_name = Column(String(255), nullable=True)
+    raw_text = Column(Text, nullable=True)
+    language = Column(String(20), nullable=True, default="en")
+    ai_transcript = Column(Text, nullable=True)                    # voice → text
+    ai_summary = Column(Text, nullable=True)                       # AI one-liner
+    ai_category = Column(String(100), nullable=True)
+    ai_priority = Column(String(50), nullable=True)
+    ai_confidence = Column(Float, nullable=True)
+    location_text = Column(String(500), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    complaint_id = Column(Integer, ForeignKey("complaints.id"), nullable=True)
+    is_processed = Column(Boolean, default=False)
+    metadata_ = Column("metadata", JSON, nullable=True)            # platform-specific extras
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    complaint = relationship("Complaint", back_populates="inbound_messages")
+    attachments = relationship("MediaAttachment", back_populates="message", cascade="all, delete-orphan")
+
+
+class MediaAttachment(Base):
+    """File attached to an InboundMessage — image, audio, video, document."""
+    __tablename__ = "media_attachments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("inbound_messages.id"), nullable=False)
+    media_type = Column(Enum(MediaType), nullable=False)
+    url = Column(String(1000), nullable=False)
+    mime_type = Column(String(100), nullable=True)
+    file_size_bytes = Column(Integer, nullable=True)
+    ai_description = Column(Text, nullable=True)   # AI caption / transcript of this file
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    message = relationship("InboundMessage", back_populates="attachments")
+
+
+class ChannelDispatch(Base):
+    """Outbound notification sent from NagaraAI to a citizen on any channel."""
+    __tablename__ = "channel_dispatches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    complaint_id = Column(Integer, ForeignKey("complaints.id"), nullable=False)
+    channel = Column(Enum(ChannelType), nullable=False)
+    recipient = Column(String(255), nullable=False)   # phone / email / chat_id
+    message_body = Column(Text, nullable=False)
+    external_id = Column(String(255), nullable=True)  # platform message-send ID
+    status = Column(String(50), default="queued")     # queued | sent | delivered | failed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    complaint = relationship("Complaint", back_populates="dispatches")
 
 
 class ComplaintUpdate(Base):

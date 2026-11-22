@@ -3,6 +3,13 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import toast from 'react-hot-toast';
 
+const NOTIFY_CHANNELS = [
+  { value: 'whatsapp', label: '💬 WhatsApp' },
+  { value: 'sms', label: '📱 SMS' },
+  { value: 'telegram', label: '✈️ Telegram' },
+  { value: 'email', label: '📧 Email' },
+];
+
 const STATUSES = ['open', 'assigned', 'in_progress', 'resolved', 'escalated', 'closed'];
 const STATUS_COLORS = {
   open: 'badge-open', assigned: 'badge-assigned', in_progress: 'badge-in_progress',
@@ -14,6 +21,9 @@ export default function ComplaintDetail({ complaint: initial, onClose, onUpdated
   const [complaint, setComplaint] = useState(initial);
   const [updating, setUpdating] = useState(false);
   const [rating, setRating] = useState(complaint.citizen_rating || 0);
+  const [notifyPanel, setNotifyPanel] = useState(false);
+  const [notifyForm, setNotifyForm] = useState({ channel: 'whatsapp', recipient: '' });
+  const [notifying, setNotifying] = useState(false);
 
   const updateStatus = async (status, note = '') => {
     setUpdating(true);
@@ -32,6 +42,22 @@ export default function ComplaintDetail({ complaint: initial, onClose, onUpdated
       setRating(r);
       toast.success('Rating submitted!');
     } catch { toast.error('Rating failed'); }
+  };
+
+  const sendNotification = async () => {
+    if (!notifyForm.recipient) { toast.error('Enter a recipient'); return; }
+    setNotifying(true);
+    try {
+      await api.post('/channels/dispatch', {
+        complaint_id: complaint.id,
+        channel: notifyForm.channel,
+        recipient: notifyForm.recipient,
+      });
+      toast.success(`Notification sent via ${notifyForm.channel}`);
+      setNotifyPanel(false);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Send failed');
+    } finally { setNotifying(false); }
   };
 
   const canUpdateStatus = ['field_officer', 'ward_officer', 'commissioner'].includes(user.role);
@@ -149,6 +175,43 @@ export default function ComplaintDetail({ complaint: initial, onClose, onUpdated
                 ⚡ Escalate
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Share / Notify panel */}
+        {canUpdateStatus && (
+          <div className="mb-4">
+            <button className="btn btn-secondary btn-sm" onClick={() => setNotifyPanel(v => !v)}>
+              📣 {notifyPanel ? 'Cancel' : 'Send Notification'}
+            </button>
+            {notifyPanel && (
+              <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)' }}>
+                <div className="form-label" style={{ marginBottom: 6 }}>Notify citizen via:</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {NOTIFY_CHANNELS.map(c => (
+                    <button
+                      key={c.value}
+                      className={`btn btn-sm ${notifyForm.channel === c.value ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setNotifyForm(f => ({ ...f, channel: c.value }))}
+                    >{c.label}</button>
+                  ))}
+                </div>
+                <input
+                  className="form-control"
+                  placeholder={
+                    notifyForm.channel === 'email' ? 'citizen@example.com' :
+                    notifyForm.channel === 'telegram' ? 'Telegram chat_id' :
+                    '+91XXXXXXXXXX'
+                  }
+                  value={notifyForm.recipient}
+                  onChange={e => setNotifyForm(f => ({ ...f, recipient: e.target.value }))}
+                  style={{ marginBottom: 8 }}
+                />
+                <button className="btn btn-primary btn-sm" disabled={notifying} onClick={sendNotification}>
+                  {notifying ? 'Sending…' : `Send via ${notifyForm.channel}`}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
